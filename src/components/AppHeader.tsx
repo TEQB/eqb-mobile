@@ -3,10 +3,11 @@ import {
   View, Text, TouchableOpacity, Image, Modal, Pressable, Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/AuthProvider";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useFeedbackCount } from "@/hooks/useFeedbackCount";
-import { Search, MessageSquare, User, Clock, LogOut } from "lucide-react-native";
+import { MessageSquare, User, Clock, LogOut } from "lucide-react-native";
 
 export default function AppHeader() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function AppHeader() {
   const [profileOpen, setProfileOpen] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const initial = user?.email?.charAt(0)?.toUpperCase() || "U";
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -26,7 +28,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <View className="flex-row items-center bg-primary px-3 h-14 shadow-lg" style={{ shadowColor: "rgba(122,16,48,0.22)", shadowOffset: { width: 0, height: 18 }, shadowOpacity: 1, shadowRadius: 45 }}>
+      <View className="flex-row items-center bg-primary px-3 shadow-lg" style={{ paddingTop: insets.top, height: 56 + insets.top, shadowColor: "rgba(122,16,48,0.22)", shadowOffset: { width: 0, height: 18 }, shadowOpacity: 1, shadowRadius: 45 }}>
         <Image source={require("@/assets/drklogo.png")} className="h-9 w-32" resizeMode="contain" />
 
         <View className="ml-auto flex-row items-center gap-1">
@@ -40,13 +42,6 @@ export default function AppHeader() {
                 <Text className="text-white text-[9px] font-bold">{feedbackCount > 9 ? "9+" : feedbackCount}</Text>
               </View>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push("/search")}
-            className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
-          >
-            <Search size={16} color="white" />
           </TouchableOpacity>
 
           <NotificationBell />
@@ -68,8 +63,9 @@ export default function AppHeader() {
       >
         <Pressable className="flex-1" onPress={() => setProfileOpen(false)}>
           <Animated.View
-            className="absolute top-14 right-2 w-56 rounded-2xl bg-white shadow-lg py-1"
+            className="absolute right-2 w-56 rounded-2xl bg-white shadow-lg py-1"
             style={{
+              top: 56 + insets.top,
               opacity: fadeAnim,
               shadowColor: "rgba(0,0,0,0.15)",
               shadowOffset: { width: 0, height: 8 },
@@ -94,7 +90,7 @@ export default function AppHeader() {
             <View className="h-px bg-border mx-4 my-1" />
             <TouchableOpacity
               className="flex-row items-center px-4 py-3"
-              onPress={() => { setProfileOpen(false); signOut(); }}
+              onPress={() => { setProfileOpen(false); signOut().then(() => router.replace("/(auth)/login")); }}
             >
               <LogOut size={16} color="#DC2626" />
               <Text className="text-destructive text-sm font-medium ml-3">Log out</Text>

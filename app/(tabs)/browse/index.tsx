@@ -97,7 +97,7 @@ export default function BrowseScreen() {
     },
   });
 
-  const { data: programmes } = useQuery({
+  const { data: programmes, isLoading: programmesLoading } = useQuery({
     queryKey: ["programmes-by-faculty", selectedFaculty],
     queryFn: async () => {
       if (!selectedFaculty) return [];
@@ -112,17 +112,29 @@ export default function BrowseScreen() {
     enabled: !!selectedFaculty,
   });
 
-  const { data: exploreCourses } = useQuery({
+  const { data: exploreCourses, isLoading: coursesLoading } = useQuery({
     queryKey: ["courses-by-programme", selectedProgramme],
     queryFn: async () => {
       if (!selectedProgramme) return [];
-      const { data, error } = await supabase
-        .from("courses")
-        .select("id, code, title, level")
-        .eq("programme_id", selectedProgramme)
-        .order("code");
-      if (error) throw error;
-      return (data as ExploreCourse[]) || [];
+      const [ownRes, linksRes] = await Promise.all([
+        supabase
+          .from("courses")
+          .select("id, code, title, level")
+          .or(`scope.eq.general,programme_id.eq.${selectedProgramme}`)
+          .order("code"),
+        supabase
+          .from("programme_courses")
+          .select("course_id, course:course_id(id, code, title, level)")
+          .eq("programme_id", selectedProgramme),
+      ]);
+      if (ownRes.error || linksRes.error) throw ownRes.error || linksRes.error;
+      const own = (ownRes.data as ExploreCourse[]) || [];
+      const links = (linksRes.data as Array<{ course_id: string; course: ExploreCourse }>) || [];
+      const linkedIds = new Set(links.map((l) => l.course_id));
+      return [
+        ...own.filter((c) => !linkedIds.has(c.id)),
+        ...links.map((l) => l.course),
+      ].sort((a, b) => a.level - b.level);
     },
     enabled: !!selectedProgramme,
   });
@@ -222,7 +234,9 @@ export default function BrowseScreen() {
           {selectedFaculty ? (
             <View>
               <Text className="text-sm font-semibold text-foreground mb-1.5">Programme</Text>
-              {programmes && programmes.length > 0 ? (
+              {programmesLoading ? (
+                <ActivityIndicator size="small" />
+              ) : programmes && programmes.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View className="flex-row gap-2">
                     {programmes.map((p) => (
@@ -239,7 +253,7 @@ export default function BrowseScreen() {
                   </View>
                 </ScrollView>
               ) : (
-                <ActivityIndicator size="small" />
+                <Text className="text-muted-foreground text-sm">No programmes found for this faculty</Text>
               )}
             </View>
           ) : null}
@@ -247,7 +261,9 @@ export default function BrowseScreen() {
           {selectedProgramme ? (
             <View>
               <Text className="text-sm font-semibold text-foreground mb-1.5">Course</Text>
-              {exploreCourses && exploreCourses.length > 0 ? (
+              {coursesLoading ? (
+                <ActivityIndicator size="small" />
+              ) : exploreCourses && exploreCourses.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View className="flex-row gap-2">
                     {exploreCourses.map((c) => (
@@ -264,7 +280,7 @@ export default function BrowseScreen() {
                   </View>
                 </ScrollView>
               ) : (
-                <ActivityIndicator size="small" />
+                <Text className="text-muted-foreground text-sm">No courses found for this programme</Text>
               )}
             </View>
           ) : null}

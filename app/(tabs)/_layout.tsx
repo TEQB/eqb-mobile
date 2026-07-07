@@ -24,35 +24,35 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="home/index"
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="browse"
+        name="browse/index"
         options={{
           title: "Browse",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="upload"
+        name="upload/index"
         options={{
           title: "Upload",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="cloud-upload" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="my-work"
+        name="my-work/index"
         options={{
           title: "My Work",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="document-text" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="profile/index"
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="person" size={size} color={color} />,

@@ -9,17 +9,26 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.eqb.mobile"
+      "bundleIdentifier": "com.eqb.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
-      "package": "com.eqb.mobile"
+      "package": "com.eqb.mobile",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -27,12 +36,23 @@
       "expo-image-picker",
       "expo-document-picker",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7A1030"
+        }
+      ]
     ],
     "extra": {
       "EXPO_PUBLIC_API_BASE_URL": "https://curious-sorbet-e77d0b.netlify.app",
       "EXPO_PUBLIC_SUPABASE_URL": "https://qcxmyqdmqenrynehdeci.supabase.co",
-      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_L4lkKOQcDQW_EukZl_kRUA_vfgfXbIf"
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_L4lkKOQcDQW_EukZl_kRUA_vfgfXbIf",
+      "router": {},
+      "eas": {
+        "projectId": "8484a7c5-f00d-4b46-9385-a53148800cd6"
+      }
     }
   }
 }

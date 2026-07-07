@@ -76,7 +76,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           className="bg-white/90 p-4 rounded-2xl flex-row items-center"
-          onPress={signOut}
+          onPress={() => signOut().then(() => router.replace("/(auth)/login"))}
         >
           <LogOut size={22} color="#DC2626" />
           <Text className="flex-1 text-destructive font-medium ml-3">Sign Out</Text>
