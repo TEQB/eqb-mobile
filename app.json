@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "EQB",
+    "slug": "eqb-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "eqb",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.eqb.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.eqb.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "EXPO_PUBLIC_API_BASE_URL": "https://curious-sorbet-e77d0b.netlify.app",
+      "EXPO_PUBLIC_SUPABASE_URL": "https://qcxmyqdmqenrynehdeci.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_L4lkKOQcDQW_EukZl_kRUA_vfgfXbIf"
+    }
+  }
+}
