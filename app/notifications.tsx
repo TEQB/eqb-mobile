@@ -21,7 +21,7 @@ export default function NotificationsScreen() {
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center gap-3">
             <TouchableOpacity onPress={() => router.back()}>
-              <ChevronLeft size={24} className="text-gray-900" />
+              <ChevronLeft size={24} color="#111827" />
             </TouchableOpacity>
             <Text className="text-2xl font-bold text-gray-900">Notifications</Text>
           </View>
@@ -43,7 +43,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           ListEmptyComponent={
             <View className="items-center mt-20">
-              <Bell size={40} className="text-gray-300 mb-3" />
+              <Bell size={40} color="#D1D5DB" />
               <Text className="text-gray-500">No notifications yet</Text>
             </View>
           }

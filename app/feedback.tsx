@@ -20,9 +20,15 @@ export default function FeedbackScreen() {
 
     setSending(true);
     try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("auth_user_id", user!.id)
+        .single();
+
       const { error } = await supabase.from("feedback_messages").insert({
         message,
-        profile_id: user!.id,
+        profile_id: (profile as any)?.id,
       } as any);
 
       if (error) throw error;

@@ -1,55 +1,61 @@
 import { Tabs } from "expo-router";
-import { Home, BookOpen, Compass, User } from "lucide-react-native";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
-
-function HeaderRight() {
-  return <NotificationBell />;
-}
+import { Ionicons } from "@expo/vector-icons";
+import AppHeader from "@/components/AppHeader";
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#DC2626",
+        header: () => <AppHeader />,
+        tabBarActiveTintColor: "#7A1030",
         tabBarInactiveTintColor: "#9CA3AF",
-        headerStyle: { backgroundColor: "#DC2626" },
-        headerTintColor: "#fff",
-        headerTitleStyle: { fontWeight: "bold" },
-        headerRight: () => <HeaderRight />,
         tabBarStyle: {
+          backgroundColor: "#FFFDFB",
           borderTopWidth: 1,
-          borderTopColor: "#E5E7EB",
+          borderTopColor: "#E5D7D0",
           paddingBottom: 4,
           height: 56,
         },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+        },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
-        name="dashboard"
+        name="home"
         options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Home size={size} color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="browse"
         options={{
           title: "Browse",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <BookOpen size={size} color={color} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="upload"
         options={{
-          title: "Explore",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Compass size={size} color={color} />,
+          title: "Upload",
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="cloud-upload" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="my-work"
+        options={{
+          title: "My Work",
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="document-text" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="person" size={size} color={color} />,
         }}
       />
     </Tabs>

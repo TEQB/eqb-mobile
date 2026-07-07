@@ -113,9 +113,15 @@ export default function QuestionDetailScreen() {
         text: "Flag",
         style: "destructive",
         onPress: async () => {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("auth_user_id", user!.id)
+            .single();
           const { error } = await supabase.from("flags").insert({
             question_id: id,
             reason: "inappropriate",
+            flagged_by: (profile as any)?.id,
           } as any);
           if (error) Alert.alert("Error", error.message);
           else Alert.alert("Flagged", "This question has been reported for review");

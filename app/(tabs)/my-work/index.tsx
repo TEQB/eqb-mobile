@@ -4,7 +4,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useQuery } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
-export default function ContributionsScreen() {
+export default function MyWorkScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = getSupabaseClient();
@@ -74,36 +74,42 @@ export default function ContributionsScreen() {
   const isLoading = qLoading || sLoading;
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-4">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text className="text-primary mb-2">← Back</Text>
-        </TouchableOpacity>
-        <Text className="text-2xl font-bold text-gray-900">My Contributions</Text>
+    <View className="flex-1 bg-background">
+      <View className="px-5 pt-5 pb-2">
+        <Text className="text-foreground text-2xl font-bold">My Work</Text>
+        <Text className="text-muted-foreground text-sm mt-1">Your contributions and solutions</Text>
       </View>
 
       {isLoading ? (
         <ActivityIndicator size="large" className="mt-10" />
       ) : (
         <SectionList
-          className="px-6 pt-4"
+          className="px-5 pt-3"
           sections={sections}
           keyExtractor={(item: any, index) => item.id + index}
           contentContainerStyle={{ paddingBottom: 24 }}
           renderSectionHeader={({ section }) => (
-            <Text className="text-lg font-bold text-gray-900 mt-4 mb-3">
-              {section.title}
-            </Text>
+            <Text className="text-lg font-bold text-foreground mt-4 mb-3">{section.title}</Text>
           )}
           renderSectionFooter={({ section }) =>
             section.data.length === 0 ? (
-              <Text className="text-gray-500 text-sm mb-4">Nothing yet</Text>
+              <View className="bg-white/90 rounded-2xl p-6 items-center mb-4">
+                <Text className="text-muted-foreground text-sm">Nothing yet</Text>
+                {section.type === "question" && (
+                  <TouchableOpacity
+                    className="mt-3 bg-primary py-2 px-5 rounded-xl"
+                    onPress={() => router.push("/(tabs)/upload")}
+                  >
+                    <Text className="text-primary-foreground font-medium text-sm">Upload your first question</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : null
           }
           renderItem={({ item, section }: any) =>
             section.type === "question" ? (
               <TouchableOpacity
-                className="bg-white p-4 rounded-xl mb-3"
+                className="bg-white/90 p-4 rounded-2xl mb-3"
                 onPress={() => router.push(`/question/${item.id}`)}
               >
                 <View className="flex-row justify-between items-center">
@@ -112,20 +118,20 @@ export default function ContributionsScreen() {
                     {item.status.replace("_", " ")}
                   </Text>
                 </View>
-                <Text className="text-gray-600 text-sm mt-1">
+                <Text className="text-muted-foreground text-sm mt-1">
                   {item.year}/{item.year + 1} · {item.semester} semester
                 </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                className="bg-white p-4 rounded-xl mb-3"
+                className="bg-white/90 p-4 rounded-2xl mb-3"
                 onPress={() => router.push(`/question/${item.question_id}`)}
               >
                 <Text className="text-primary font-bold">{item.past_questions?.courses?.code}</Text>
-                <Text className="text-gray-600 text-sm mt-1">
+                <Text className="text-muted-foreground text-sm mt-1">
                   {item.past_questions?.year}/{item.past_questions?.year + 1}
                 </Text>
-                <Text className="text-gray-500 text-xs mt-1">
+                <Text className="text-muted-foreground text-xs mt-1">
                   {item.upvotes} upvotes · {item.downvotes} downvotes
                 </Text>
               </TouchableOpacity>

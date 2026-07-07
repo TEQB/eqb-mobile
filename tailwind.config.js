@@ -5,30 +5,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        background: "#F7F2EC",
+        foreground: "#3F2732",
+        card: "#FFFDFB",
+        border: "#E5D7D0",
+        input: "#D8C8C0",
+        ring: "#D4750A",
         primary: {
-          DEFAULT: "#DC2626",
-          light: "#FCA5A5",
-          dark: "#991B1B",
+          DEFAULT: "#7A1030",
+          foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#F59E0B",
-          light: "#FDE68A",
-          dark: "#B45309",
+          DEFAULT: "#D4750A",
+          foreground: "#FFFFFF",
         },
         muted: {
-          DEFAULT: "#6B7280",
-          light: "#9CA3AF",
-          dark: "#4B5563",
+          DEFAULT: "#F1E8E2",
+          foreground: "#6C5560",
         },
         accent: {
-          DEFAULT: "#3B82F6",
-          light: "#93C5FD",
-          dark: "#1D4ED8",
+          DEFAULT: "#FBE8D0",
+          foreground: "#7A1030",
         },
-        success: "#10B981",
-        warning: "#F59E0B",
-        danger: "#EF4444",
-        info: "#3B82F6",
+        destructive: {
+          DEFAULT: "#DC2626",
+          foreground: "#FFFFFF",
+        },
       },
     },
   },

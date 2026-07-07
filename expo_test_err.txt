@@ -1,3 +1,24 @@
 The following packages should be updated for best compatibility with the installed expo version:
   react-native-worklets@0.10.2 - expected version: 0.5.1
 Your project may not work correctly until you install the expected versions of the packages.
+C:\Users\ifeol\Desktop\Projects\PQB-Mobile\node_modules\@expo\cli\build\src\utils\errors.js:130
+    throw error;
+    ^
+
+Error: ENOENT: no such file or directory, watch 'C:\Users\ifeol\Desktop\Projects\PQB-Mobile\dist\_expo\static\js\android'
+    at FSWatcher.<computed> (node:internal/fs/watchers:254:19)
+    at Object.watch (node:fs:2549:36)
+    at FallbackWatcher._watchdir (C:\Users\ifeol\Desktop\Projects\PQB-Mobile\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:119:33)
+    at C:\Users\ifeol\Desktop\Projects\PQB-Mobile\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:219:22
+    at Walker.<anonymous> (C:\Users\ifeol\Desktop\Projects\PQB-Mobile\node_modules\@expo\metro\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:358:5)
+    at Walker.emit (node:events:518:28)
+    at C:\Users\ifeol\Desktop\Projects\PQB-Mobile\node_modules\walker\lib\walker.js:69:16
+    at FSReqCallback.oncomplete (node:fs:187:23) {
+  errno: -4058,
+  syscall: 'watch',
+  code: 'ENOENT',
+  path: 'C:\\Users\\ifeol\\Desktop\\Projects\\PQB-Mobile\\dist\\_expo\\static\\js\\android',
+  filename: 'C:\\Users\\ifeol\\Desktop\\Projects\\PQB-Mobile\\dist\\_expo\\static\\js\\android'
+}
+
+Node.js v22.18.0
