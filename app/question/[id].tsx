@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ComponentRef } from "react";
 import {
   View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Dimensions, Image, Alert, Modal,
 } from "react-native";
@@ -30,7 +30,7 @@ export default function QuestionDetailScreen() {
   const supabase = getSupabaseClient();
   const { user } = useAuth();
   const API_BASE = getApiBaseUrl();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagReason, setFlagReason] = useState("");

@@ -305,7 +305,7 @@ export default function RegisterScreen() {
 
               <TouchableOpacity
                 className="bg-primary py-4 rounded-xl items-center mt-2"
-                onPress={handleSubmit(onSubmit)}
+                onPress={() => handleSubmit(onSubmit)()}
                 disabled={loading}
               >
                 {loading ? (

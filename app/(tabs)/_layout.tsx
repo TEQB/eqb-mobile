@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Tabs, useRouter, usePathname } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Home, Search, Upload, FileText, User } from "lucide-react-native";
 import AppHeader from "@/components/AppHeader";
 import { useLockStatus } from "@/hooks/useLockStatus";
 
@@ -51,7 +51,7 @@ export default function TabLayout() {
         listeners={blockIfLocked}
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="home" size={size} color={color} />,
+          tabBarIcon: ({ color, size }: any) => <Home color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -59,14 +59,14 @@ export default function TabLayout() {
         listeners={blockIfLocked}
         options={{
           title: "Browse",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="search" size={size} color={color} />,
+          tabBarIcon: ({ color, size }: any) => <Search color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="upload/index"
         options={{
           title: "Upload",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="cloud-upload" size={size} color={color} />,
+          tabBarIcon: ({ color, size }: any) => <Upload color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -74,7 +74,7 @@ export default function TabLayout() {
         listeners={blockIfLocked}
         options={{
           title: "My Work",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="document-text" size={size} color={color} />,
+          tabBarIcon: ({ color, size }: any) => <FileText color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -82,7 +82,7 @@ export default function TabLayout() {
         listeners={blockIfLocked}
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ color, size }: any) => <User color={color} size={size} />,
         }}
       />
     </Tabs>
