@@ -8,6 +8,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema } from "@/lib/validations";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getUniversityEmailDomain } from "@/lib/env";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react-native";
 
@@ -53,6 +54,7 @@ export default function RegisterScreen() {
   const openRegistrationLevels = openLevelsData ?? [];
   const isOpenLevel =
     watchCurrentLevel != null && openRegistrationLevels.includes(watchCurrentLevel);
+  const universityDomain = getUniversityEmailDomain();
 
   const { data: faculties } = useQuery({
     queryKey: ["faculties"],
@@ -80,6 +82,13 @@ export default function RegisterScreen() {
     if (!isOpen && !data.matricNumber?.trim()) {
       Alert.alert("Matric number required", "Please enter your matric number.");
       return;
+    }
+    if (!isOpen) {
+      const domain = getUniversityEmailDomain();
+      if (domain && !data.email.toLowerCase().endsWith(domain.toLowerCase())) {
+        Alert.alert("University email required", `Please use your ${domain} email address to register.`);
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -177,7 +186,7 @@ export default function RegisterScreen() {
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
                       className="h-12 rounded-xl border border-input bg-white/90 px-4 text-foreground"
-                      placeholder={isOpenLevel ? "you@example.com" : "you@university.edu.ng"}
+                      placeholder={isOpenLevel ? "you@example.com" : universityDomain ? `you@${universityDomain.replace(/^@/, "")}` : "you@university.edu.ng"}
                       placeholderTextColor="#9CA3AF"
                       keyboardType="email-address"
                       autoCapitalize="none"

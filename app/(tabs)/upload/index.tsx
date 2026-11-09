@@ -4,9 +4,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getApiBaseUrl } from "@/lib/env";
+import { useLockStatus } from "@/hooks/useLockStatus";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
@@ -53,19 +54,8 @@ export default function UploadTabScreen() {
     enabled: !!activeLevel,
   });
 
-  const { data: lockInfo } = useQuery({
-    queryKey: ["upload-lock", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("is_locked, lock_reason")
-        .eq("auth_user_id", user!.id)
-        .single();
-      if (error) return null;
-      return data as { is_locked: boolean; lock_reason: string | null } | null;
-    },
-    enabled: !!user,
-  });
+  const queryClient = useQueryClient();
+  const { data: lockInfo } = useLockStatus();
 
   const pickFromCamera = async () => {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
@@ -149,6 +139,10 @@ export default function UploadTabScreen() {
       const result = (await res.json()) as { pass: boolean; reason: string };
 
       if (result.pass) {
+        // A passing upload publishes the question, which triggers
+        // handle_question_published() to set is_locked = false. Refetch so the
+        // tab lock releases and the student regains full navigation.
+        queryClient.invalidateQueries({ queryKey: ["lock-status"] });
         Alert.alert("Uploaded!", "Your question passed moderation and is now live.", [
           { text: "OK" },
         ]);
