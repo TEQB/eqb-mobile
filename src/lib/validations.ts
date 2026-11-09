@@ -8,7 +8,7 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   fullName: z.string().min(2).max(100),
   email: z.string().email(),
-  matricNumber: z.string(),
+  matricNumber: z.string().optional(),
   facultyId: z.string().uuid(),
   programmeId: z.string().uuid(),
   currentLevel: z.preprocess(

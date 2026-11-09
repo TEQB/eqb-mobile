@@ -53,6 +53,20 @@ export default function UploadTabScreen() {
     enabled: !!activeLevel,
   });
 
+  const { data: lockInfo } = useQuery({
+    queryKey: ["upload-lock", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_locked, lock_reason")
+        .eq("auth_user_id", user!.id)
+        .single();
+      if (error) return null;
+      return data as { is_locked: boolean; lock_reason: string | null } | null;
+    },
+    enabled: !!user,
+  });
+
   const pickFromCamera = async () => {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
@@ -160,6 +174,22 @@ export default function UploadTabScreen() {
         <Text className="text-foreground text-2xl font-bold">Upload Question</Text>
         <Text className="text-muted-foreground text-sm mt-1">Share past questions with your peers</Text>
       </View>
+
+      {lockInfo?.is_locked && (
+        <View
+          style={{ backgroundColor: "#FEF2F2", borderColor: "#FECACA", borderWidth: 1 }}
+          className="mx-5 mb-3 rounded-2xl px-4 py-3"
+        >
+          <Text className="text-sm font-semibold" style={{ color: "#DC2626" }}>
+            Your account access is restricted
+          </Text>
+          <Text className="text-sm mt-1" style={{ color: "#991B1B" }}>
+            {lockInfo.lock_reason && lockInfo.lock_reason.trim()
+              ? `${lockInfo.lock_reason.trim()} — upload a past question to regain full access to EQB.`
+              : "You haven't uploaded a past question within the required period. Upload one to regain full access to EQB."}
+          </Text>
+        </View>
+      )}
 
       <View className="px-5 pb-8 gap-4">
         <View>

@@ -36,6 +36,24 @@ export default function RegisterScreen() {
   const watchCurrentLevel = watch("currentLevel");
   const supabase = getSupabaseClient();
 
+  const { data: openLevelsData } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_settings")
+        .select("open_registration_levels")
+        .single();
+      if (error) return [];
+      return (
+        (data as { open_registration_levels: number[] | null } | null)
+          ?.open_registration_levels ?? []
+      );
+    },
+  });
+  const openRegistrationLevels = openLevelsData ?? [];
+  const isOpenLevel =
+    watchCurrentLevel != null && openRegistrationLevels.includes(watchCurrentLevel);
+
   const { data: faculties } = useQuery({
     queryKey: ["faculties"],
     queryFn: async () => {
@@ -58,6 +76,11 @@ export default function RegisterScreen() {
   const filteredProgrammes = allProgrammes?.filter((p) => p.faculty_id === watchFacultyId) || [];
 
   const onSubmit = async (data: RegisterForm) => {
+    const isOpen = openRegistrationLevels.includes(data.currentLevel);
+    if (!isOpen && !data.matricNumber?.trim()) {
+      Alert.alert("Matric number required", "Please enter your matric number.");
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -65,7 +88,7 @@ export default function RegisterScreen() {
         options: {
           data: {
             full_name: data.fullName,
-            matric_number: data.matricNumber,
+            matric_number: data.matricNumber || undefined,
             programme_id: data.programmeId,
             current_level: data.currentLevel,
           },
@@ -102,7 +125,9 @@ export default function RegisterScreen() {
               <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Create Account</Text>
               <Text className="mt-3 text-3xl font-bold tracking-tight text-primary">Join the community</Text>
               <Text className="mt-2 text-sm leading-6 text-muted-foreground text-center">
-                Sign up with your university email to get started.
+                {openRegistrationLevels.length > 0
+                  ? "Sign up with your email to get started. New students can use any email and add details later."
+                  : "Sign up with your university email to get started."}
               </Text>
             </View>
 
@@ -113,6 +138,16 @@ export default function RegisterScreen() {
                 <Text className="text-muted-foreground">Step 2: Verify Email</Text>
               </Text>
             </View>
+
+            {isOpenLevel && (
+              <View className="rounded-2xl bg-secondary/10 border border-secondary/30 px-4 py-3 mb-6">
+                <Text className="text-sm font-semibold text-secondary">New intake registration</Text>
+                <Text className="text-sm text-secondary/80 mt-1">
+                  You can use any email and your matric number is optional for now.
+                  Update your details in your profile once you have them.
+                </Text>
+              </View>
+            )}
 
             <View className="gap-4">
               <View>
@@ -135,14 +170,14 @@ export default function RegisterScreen() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-foreground mb-1.5">University Email</Text>
+                <Text className="text-sm font-semibold text-foreground mb-1.5">{isOpenLevel ? "Email" : "University Email"}</Text>
                 <Controller
                   control={control}
                   name="email"
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
                       className="h-12 rounded-xl border border-input bg-white/90 px-4 text-foreground"
-                      placeholder="you@university.edu.ng"
+                      placeholder={isOpenLevel ? "you@example.com" : "you@university.edu.ng"}
                       placeholderTextColor="#9CA3AF"
                       keyboardType="email-address"
                       autoCapitalize="none"
@@ -156,7 +191,9 @@ export default function RegisterScreen() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-foreground mb-1.5">Matric Number</Text>
+                <Text className="text-sm font-semibold text-foreground mb-1.5">
+                  Matric Number{isOpenLevel ? " (optional)" : ""}
+                </Text>
                 <Controller
                   control={control}
                   name="matricNumber"
