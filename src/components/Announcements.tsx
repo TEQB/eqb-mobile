@@ -55,7 +55,7 @@ export function Announcements() {
       .channel("announcements")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "announcements" },
+        { event: "*", schema: "public", table: "announcements" },
         () => {
           fetchAnnouncements();
         },
