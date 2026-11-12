@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { ChevronRight } from "lucide-react-native";
 
@@ -18,6 +18,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const supabase = getSupabaseClient();
+  const queryClient = useQueryClient();
 
   const { data: profile } = useQuery({
     queryKey: ["profile-full", user?.id],
@@ -93,7 +94,21 @@ export default function HomeScreen() {
   );
 
   return (
-    <ScrollView className="flex-1 bg-background">
+    <ScrollView
+      className="flex-1 bg-background"
+      refreshControl={
+        <RefreshControl
+          refreshing={coursesLoading}
+          onRefresh={() => {
+            queryClient.invalidateQueries({ queryKey: ["courses-for-programme"] });
+            queryClient.invalidateQueries({ queryKey: ["question-counts"] });
+            queryClient.invalidateQueries({ queryKey: ["profile-full"] });
+          }}
+          tintColor="#7A1030"
+          colors={["#7A1030"]}
+        />
+      }
+    >
       <View className="px-5 pt-5 pb-2">
         <Text className="text-muted-foreground text-sm">Welcome back,</Text>
         <Text className="text-foreground text-2xl font-bold">{((profile as any)?.full_name as string) || "Student"}</Text>

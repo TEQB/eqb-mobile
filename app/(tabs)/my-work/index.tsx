@@ -1,13 +1,14 @@
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, SectionList } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, SectionList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function MyWorkScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = getSupabaseClient();
+  const queryClient = useQueryClient();
 
   const { data: profile } = useQuery({
     queryKey: ["profile-id", user?.id],
@@ -88,6 +89,16 @@ export default function MyWorkScreen() {
           sections={sections}
           keyExtractor={(item: any, index) => item.id + index}
           contentContainerStyle={{ paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={() => {
+                queryClient.invalidateQueries();
+              }}
+              tintColor="#7A1030"
+              colors={["#7A1030"]}
+            />
+          }
           renderSectionHeader={({ section }) => (
             <Text className="text-lg font-bold text-foreground mt-4 mb-3">{section.title}</Text>
           )}

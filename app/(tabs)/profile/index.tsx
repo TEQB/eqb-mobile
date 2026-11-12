@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,7 +60,19 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background">
+    <ScrollView
+      className="flex-1 bg-background"
+      refreshControl={
+        <RefreshControl
+          refreshing={isLoading}
+          onRefresh={() => {
+            queryClient.invalidateQueries();
+          }}
+          tintColor="#7A1030"
+          colors={["#7A1030"]}
+        />
+      }
+    >
       <View className="items-center pt-8 pb-6 px-5">
         <View className="w-20 h-20 bg-primary rounded-full items-center justify-center mb-3 shadow-lg" style={{ shadowColor: "rgba(122,16,48,0.15)", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 24 }}>
           <Text className="text-3xl font-bold text-primary-foreground">

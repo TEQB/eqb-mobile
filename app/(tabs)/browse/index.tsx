@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshControl } from "react-native";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { Search, ChevronRight } from "lucide-react-native";
 
@@ -22,6 +23,7 @@ export default function BrowseScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = getSupabaseClient();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
   const { data: profile } = useQuery({
@@ -153,7 +155,19 @@ export default function BrowseScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background">
+    <ScrollView
+      className="flex-1 bg-background"
+      refreshControl={
+        <RefreshControl
+          refreshing={coursesLoading}
+          onRefresh={() => {
+            queryClient.invalidateQueries();
+          }}
+          tintColor="#7A1030"
+          colors={["#7A1030"]}
+        />
+      }
+    >
       <View className="px-5 pt-5 pb-2">
         <Text className="text-foreground text-2xl font-bold">Browse Courses</Text>
         <View className="flex-row items-center bg-white/90 rounded-xl px-4 h-12 mt-3 border border-input">
