@@ -12,3 +12,4 @@ web-build/
 google-services.json
 *-firebase-adminsdk-*.json
 supabase/.temp/
+*.apk

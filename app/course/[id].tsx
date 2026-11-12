@@ -2,6 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from "react
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { MessageCircle } from "lucide-react-native";
 
 interface Course {
   id: string;
@@ -55,6 +56,13 @@ export default function CourseDetailScreen() {
         </TouchableOpacity>
         <Text className="text-2xl font-bold text-gray-900">{course?.code || "Loading..."}</Text>
         <Text className="text-gray-600 mt-1">{course?.title}</Text>
+        <TouchableOpacity
+          className="mt-3 flex-row items-center gap-2 bg-primary rounded-xl px-4 py-2.5 self-start"
+          onPress={() => router.push(`/group/course/${id}`)}
+        >
+          <MessageCircle size={18} color="white" />
+          <Text className="text-primary-foreground font-semibold text-sm">Study Group</Text>
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (

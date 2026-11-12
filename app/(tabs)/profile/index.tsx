@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { Clock, MessageSquare, LogOut, ChevronRight, User, Mail, BookOpen, AlertCircle } from "lucide-react-native";
+import { Clock, MessageSquare, LogOut, ChevronRight, Mail, BookOpen, AlertCircle, Phone } from "lucide-react-native";
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -13,13 +13,17 @@ export default function ProfileScreen() {
   const supabase = getSupabaseClient();
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [savingLevel, setSavingLevel] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactLoaded, setContactLoaded] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, matric_number, current_level, programmes(name, available_levels)")
+        .select("full_name, matric_number, current_level, phone_number, bank_account_number, programmes(name, available_levels)")
         .eq("auth_user_id", user!.id)
         .single();
       if (error) throw error;
@@ -27,6 +31,29 @@ export default function ProfileScreen() {
     },
     enabled: !!user,
   });
+
+  if (profile && !contactLoaded) {
+    setPhone((profile.phone_number as string) || "");
+    setAccountNumber((profile.bank_account_number as string) || "");
+    setContactLoaded(true);
+  }
+
+  const handleSaveContact = async () => {
+    setSavingContact(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ phone_number: phone.trim() || null, bank_account_number: accountNumber.trim() || null })
+        .eq("auth_user_id", user!.id);
+      if (error) throw error;
+      Alert.alert("Saved", "Your contact details have been updated.");
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+    } catch (err: any) {
+      Alert.alert("Could not save", err.message || "Please try again");
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   const { data: levelChangeEnabled } = useQuery({
     queryKey: ["public-settings", "level_change"],
@@ -144,6 +171,50 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
+        <View
+          style={{ backgroundColor: "#FFFDFB", borderColor: "#E5D7D0", borderWidth: 1 }}
+          className="rounded-2xl p-4"
+        >
+          <View className="flex-row items-center mb-3">
+            <Phone size={18} color="#7A1030" />
+            <Text className="text-foreground font-semibold ml-2">Contact details</Text>
+          </View>
+          <Text className="text-xs text-muted-foreground mb-3">
+            Only shared in study groups if you choose to share them. You are always identified by matric number.
+          </Text>
+          <View className="gap-3">
+            <View>
+              <Text className="text-sm font-semibold text-foreground mb-1.5">Phone number</Text>
+              <TextInput
+                className="h-12 rounded-xl border border-input bg-white px-4 text-foreground"
+                placeholder="0803 000 0000"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+              />
+            </View>
+            <View>
+              <Text className="text-sm font-semibold text-foreground mb-1.5">Account number</Text>
+              <TextInput
+                className="h-12 rounded-xl border border-input bg-white px-4 text-foreground"
+                placeholder="0123456789"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                value={accountNumber}
+                onChangeText={setAccountNumber}
+              />
+            </View>
+            <TouchableOpacity
+              className="bg-primary py-3 rounded-xl items-center mt-1"
+              onPress={handleSaveContact}
+              disabled={savingContact}
+            >
+              {savingContact ? <ActivityIndicator color="white" /> : <Text className="text-primary-foreground font-semibold text-sm">Save contact details</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <TouchableOpacity
           className="bg-white/90 p-4 rounded-2xl flex-row items-center"
           onPress={() => router.push("/(tabs)/my-work")}

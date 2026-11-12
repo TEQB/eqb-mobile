@@ -13,6 +13,8 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="question/[id]" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="group/[id]" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="group/course/[courseId]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="feedback" options={{ presentation: "modal" }} />
       </Stack>
     </AppProviders>

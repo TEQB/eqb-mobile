@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { Tabs, useRouter, usePathname } from "expo-router";
-import { Home, Search, Upload, FileText, User } from "lucide-react-native";
+import { Home, Search, Upload, FileText, User, MessageCircle } from "lucide-react-native";
 import AppHeader from "@/components/AppHeader";
+import { Announcements } from "@/components/Announcements";
 import { useLockStatus } from "@/hooks/useLockStatus";
 
 export default function TabLayout() {
@@ -27,6 +28,7 @@ export default function TabLayout() {
   };
 
   return (
+    <>
     <Tabs
       screenOptions={{
         header: () => <AppHeader />,
@@ -78,6 +80,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="groups/index"
+        listeners={blockIfLocked}
+        options={{
+          title: "Groups",
+          tabBarIcon: ({ color, size }: any) => <MessageCircle color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile/index"
         listeners={blockIfLocked}
         options={{
@@ -86,5 +96,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <Announcements />
+    </>
   );
 }
