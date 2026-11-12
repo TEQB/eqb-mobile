@@ -17,8 +17,6 @@ export interface StudyGroup {
   my_role?: string;
   my_privacy?: {
     share_name: boolean;
-    share_phone: boolean;
-    share_account_number: boolean;
   };
   course?: { id: string; code: string; title: string; level: number };
 }
@@ -31,13 +29,9 @@ export interface GroupMember {
   is_me: boolean;
   matric_number: string | null;
   full_name: string | null;
-  phone_number: string | null;
-  bank_account_number: string | null;
   programme_name: string | null;
   current_level: number | null;
   share_name: boolean;
-  share_phone: boolean;
-  share_account_number: boolean;
 }
 
 async function authedFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -84,7 +78,7 @@ export const studyGroupsApi = {
   detail: (groupId: string) =>
     authedFetch<{ group: StudyGroup; members: GroupMember[] }>(`/study-groups/${groupId}`),
 
-  updatePrivacy: (groupId: string, privacy: { share_name: boolean; share_phone: boolean; share_account_number: boolean }) =>
+  updatePrivacy: (groupId: string, privacy: { share_name: boolean }) =>
     authedFetch<{ success: boolean }>(`/study-groups/${groupId}`, {
       method: "PATCH",
       body: JSON.stringify({ action: "update-privacy", ...privacy }),

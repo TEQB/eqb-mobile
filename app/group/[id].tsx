@@ -237,13 +237,10 @@ export default function GroupChatScreen() {
     ]);
   };
 
-  const updatePrivacy = async (key: "share_name" | "share_phone" | "share_account_number", value: boolean) => {
+  const updatePrivacy = async (key: "share_name", value: boolean) => {
     if (!myMembership) return;
     const next = {
-      share_name: myMembership.share_name,
-      share_phone: myMembership.share_phone,
-      share_account_number: myMembership.share_account_number,
-      [key]: value,
+      share_name: value,
     };
     try {
       await studyGroupsApi.updatePrivacy(id!, next);
@@ -426,8 +423,6 @@ export default function GroupChatScreen() {
             </Text>
             {([
               ["share_name", "Share my name"],
-              ["share_phone", "Share my phone number"],
-              ["share_account_number", "Share my account number"],
             ] as const).map(([key, label]) => (
               <View key={key} className="flex-row items-center justify-between py-2">
                 <Text className="text-foreground text-sm">{label}</Text>
@@ -464,8 +459,6 @@ export default function GroupChatScreen() {
                 <Text className="text-muted-foreground text-xs mt-0.5">
                   {m.programme_name ?? ""}{m.current_level ? ` · Level ${m.current_level}` : ""}
                 </Text>
-                {m.phone_number && <Text className="text-xs text-muted-foreground mt-0.5">📞 {m.phone_number}</Text>}
-                {m.bank_account_number && <Text className="text-xs text-muted-foreground">🏦 {m.bank_account_number}</Text>}
               </View>
               {isAdmin && !m.is_me && (
                 <TouchableOpacity onPress={() => handleRemoveMember(m.profile_id, m.matric_number ?? "this member")} className="p-2">
