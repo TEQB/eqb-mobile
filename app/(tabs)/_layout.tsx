@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Tabs, useRouter, usePathname } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Search, Upload, FileText, User, MessageCircle } from "lucide-react-native";
 import AppHeader from "@/components/AppHeader";
 import { Announcements } from "@/components/Announcements";
@@ -10,6 +11,7 @@ export default function TabLayout() {
   const pathname = usePathname();
   const { data } = useLockStatus();
   const isLocked = !!data?.is_locked;
+  const insets = useSafeAreaInsets();
 
   // When locked, force the student onto the Upload tab. The tabPress listeners
   // below block switching away from Upload; this redirect catches the initial
@@ -38,11 +40,11 @@ export default function TabLayout() {
           backgroundColor: "#FFFDFB",
           borderTopWidth: 1,
           borderTopColor: "#E5D7D0",
-          paddingBottom: 4,
-          height: 56,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          height: 68 + (insets.bottom > 0 ? insets.bottom : 0),
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "600",
         },
         tabBarHideOnKeyboard: true,
