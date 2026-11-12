@@ -149,10 +149,7 @@ export default function GroupChatScreen() {
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
     try {
-      const { error } = await supabase
-        .from("study_group_messages")
-        .insert({ group_id: id!, sender_id: myProfileId, content, type: "text", reply_to_id: replyId });
-      if (error) throw error;
+      await studyGroupsApi.sendMessage(id!, { content, type: "text", reply_to_id: replyId });
     } catch (err: any) {
       Alert.alert("Failed to send", err.message || "Please try again");
       setInput(content);
@@ -189,15 +186,7 @@ export default function GroupChatScreen() {
       });
       if (uploadError) throw uploadError;
 
-      const { error } = await supabase.from("study_group_messages").insert({
-        group_id: id!,
-        sender_id: myProfileId!,
-        content: null,
-        type: "image",
-        media_url: path,
-        reply_to_id: replyTo?.id ?? null,
-      });
-      if (error) throw error;
+      await studyGroupsApi.sendMessage(id!, { type: "image", media_url: path, reply_to_id: replyTo?.id ?? null });
       setReplyTo(null);
     } catch (err: any) {
       Alert.alert("Failed to send image", err.message || "Please try again");

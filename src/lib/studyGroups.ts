@@ -101,4 +101,15 @@ export const studyGroupsApi = {
       method: "PATCH",
       body: JSON.stringify({ action: "remove-member", member_id: memberProfileId }),
     }),
+
+  sendMessage: (groupId: string, payload: {
+    content?: string;
+    type: "text" | "image" | "voice";
+    media_url?: string | null;
+    reply_to_id?: string | null;
+  }) =>
+    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
