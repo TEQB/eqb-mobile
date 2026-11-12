@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
@@ -39,6 +39,13 @@ export default function HomeScreen() {
   const availableLevels = ((profile as any)?.programme?.available_levels as number[]) || [100, 200, 300, 400, 500, 600];
 
   const [activeLevel, setActiveLevel] = useState(currentLevel || 100);
+
+  // Update activeLevel when profile loads
+  useEffect(() => {
+    if (currentLevel) {
+      setActiveLevel(currentLevel);
+    }
+  }, [currentLevel]);
 
   const { data: allCourses, isLoading: coursesLoading } = useQuery({
     queryKey: ["courses-for-programme", programmeId],
