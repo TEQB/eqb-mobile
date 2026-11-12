@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { Alert } from "react-native";
 import { Tabs, useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Updates from "expo-updates";
 import { Home, Search, Upload, FileText, User, MessageCircle } from "lucide-react-native";
 import AppHeader from "@/components/AppHeader";
 import { Announcements } from "@/components/Announcements";
@@ -12,6 +14,33 @@ export default function TabLayout() {
   const { data } = useLockStatus();
   const isLocked = !!data?.is_locked;
   const insets = useSafeAreaInsets();
+
+  // Check for OTA updates on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          Alert.alert(
+            "Update available",
+            "A new version of the app is ready. Install now?",
+            [
+              { text: "Later", style: "cancel" },
+              {
+                text: "Update now",
+                onPress: async () => {
+                  await Updates.fetchUpdateAsync();
+                  await Updates.reloadAsync();
+                },
+              },
+            ],
+          );
+        }
+      } catch {
+        // Non-fatal: update check may fail in dev or with certain configurations
+      }
+    })();
+  }, []);
 
   // When locked, force the student onto the Upload tab. The tabPress listeners
   // below block switching away from Upload; this redirect catches the initial

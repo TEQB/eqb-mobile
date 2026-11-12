@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput,
-  Modal, Alert, KeyboardAvoidingView, Platform,
+  Modal, Alert, KeyboardAvoidingView, Platform, RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ export default function GroupsScreen() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["study-groups-mine"],
     queryFn: () => studyGroupsApi.listMine(),
   });
@@ -117,6 +117,16 @@ export default function GroupsScreen() {
           data={groups}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={() => {
+                refetch().catch(() => {});
+              }}
+              tintColor="#7A1030"
+              colors={["#7A1030"]}
+            />
+          }
           ListEmptyComponent={
             <View className="items-center mt-10">
               <Users size={40} color="#D1D5DB" />

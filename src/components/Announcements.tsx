@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Megaphone, X } from "lucide-react-native";
 import { useAuth } from "@/providers/AuthProvider";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import { announcementsApi, type Announcement } from "@/lib/announcements";
 
 export function Announcements() {
@@ -20,27 +21,51 @@ export function Announcements() {
     }
   }, []);
 
+  const fetchAnnouncements = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { announcements } = await announcementsApi.list();
+      setItems(announcements);
+      const modals = announcements.filter((a) => a.display_type === "modal");
+      if (modals.length > 0) {
+        setModalQueue(modals);
+        modals.forEach((m) => mark(m.id, "shown"));
+      }
+    } catch {
+      // non-fatal (e.g. API not deployed yet)
+    }
+  }, [user, mark]);
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      try {
-        const { announcements } = await announcementsApi.list();
-        if (cancelled) return;
-        setItems(announcements);
-        const modals = announcements.filter((a) => a.display_type === "modal");
-        if (modals.length > 0) {
-          setModalQueue(modals);
-          modals.forEach((m) => mark(m.id, "shown"));
-        }
-      } catch {
-        // non-fatal (e.g. API not deployed yet)
-      }
+      await fetchAnnouncements();
     })();
     return () => {
       cancelled = true;
     };
-  }, [user, mark]);
+  }, [user, fetchAnnouncements]);
+
+  // Realtime: listen for new announcements
+  useEffect(() => {
+    if (!user) return;
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel("announcements")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "announcements" },
+        () => {
+          fetchAnnouncements();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchAnnouncements]);
 
   const closeModal = (a: Announcement) => {
     setModalQueue((q) => q.filter((m) => m.id !== a.id));
