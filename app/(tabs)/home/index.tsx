@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Linking } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Linking, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { ChevronRight, Download, Smartphone } from "lucide-react-native";
+import QRCode from "react-native-qrcode-svg";
+import { ChevronRight, Download, Smartphone, X } from "lucide-react-native";
 
 interface StudentCourse {
   id: string;
@@ -19,6 +20,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const supabase = getSupabaseClient();
   const queryClient = useQueryClient();
+  const [apkQrOpen, setApkQrOpen] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["profile-full", user?.id],
@@ -105,6 +107,7 @@ export default function HomeScreen() {
   );
 
   return (
+    <>
     <ScrollView
       className="flex-1 bg-background"
       refreshControl={
@@ -150,7 +153,7 @@ export default function HomeScreen() {
         <TouchableOpacity
           className="mx-5 mt-3 bg-white/90 rounded-2xl p-4 flex-row items-center shadow-sm"
           style={{ shadowColor: "rgba(63,39,50,0.06)", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 }}
-          onPress={() => Linking.openURL(apkUrl)}
+          onPress={() => setApkQrOpen(true)}
         >
           <View className="w-11 h-11 bg-primary rounded-xl items-center justify-center">
             <Smartphone size={20} color="white" />
@@ -188,6 +191,33 @@ export default function HomeScreen() {
         </View>
       )}
     </ScrollView>
+
+    <Modal visible={apkQrOpen} transparent animationType="fade" onRequestClose={() => setApkQrOpen(false)}>
+      <View className="flex-1 bg-black/50 items-center justify-center px-6">
+        <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center">
+          <View className="w-full flex-row items-center justify-between mb-4">
+            <Text className="text-lg font-bold text-foreground">Download EQB App</Text>
+            <TouchableOpacity onPress={() => setApkQrOpen(false)} className="p-1">
+              <X size={22} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          <Text className="text-sm text-muted-foreground text-center mb-4">
+            Scan this code with another phone to download the app, or tap below to download on this device.
+          </Text>
+          <View className="bg-white p-4 rounded-2xl border border-border mb-4">
+            <QRCode value={apkUrl ?? ""} size={200} />
+          </View>
+          <TouchableOpacity
+            className="w-full bg-primary py-3.5 rounded-2xl flex-row items-center justify-center gap-2"
+            onPress={() => apkUrl && Linking.openURL(apkUrl)}
+          >
+            <Download size={18} color="white" />
+            <Text className="text-primary-foreground font-semibold">Download on this device</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
