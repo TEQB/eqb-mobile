@@ -39,7 +39,8 @@
       "expo-document-picker",
       "expo-font",
       "expo-web-browser",
-      "expo-camera"
+      "expo-camera",
+      "./plugins/withArm64Only"
     ],
     "extra": {
       "EXPO_PUBLIC_API_BASE_URL": "https://www.eqb.info",
