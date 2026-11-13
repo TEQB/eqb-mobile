@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, Download, Smartphone } from "lucide-react-native";
 
 interface StudentCourse {
   id: string;
@@ -47,6 +47,17 @@ export default function HomeScreen() {
       setActiveLevel(currentLevel);
     }
   }, [currentLevel]);
+
+  const { data: apkUrl } = useQuery({
+    queryKey: ["apk-download-url"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("apk_download_url")
+        .single();
+      return (data as any)?.apk_download_url as string | null;
+    },
+  });
 
   const { data: allCourses, isLoading: coursesLoading } = useQuery({
     queryKey: ["courses-for-programme", programmeId],
@@ -134,6 +145,26 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
       </View>
+
+      {apkUrl && (
+        <TouchableOpacity
+          className="mx-5 mt-3 bg-white/90 rounded-2xl p-4 flex-row items-center shadow-sm"
+          style={{ shadowColor: "rgba(63,39,50,0.06)", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 }}
+          onPress={() => Linking.openURL(apkUrl)}
+        >
+          <View className="w-11 h-11 bg-primary rounded-xl items-center justify-center">
+            <Smartphone size={20} color="white" />
+          </View>
+          <View className="flex-1 ml-3">
+            <Text className="text-foreground font-semibold">Get the EQB mobile app</Text>
+            <Text className="text-muted-foreground text-xs mt-0.5">Download the latest APK for Android</Text>
+          </View>
+          <View className="bg-primary rounded-full px-4 py-2 flex-row items-center gap-1.5">
+            <Download size={14} color="white" />
+            <Text className="text-primary-foreground text-xs font-semibold">Download</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {coursesLoading ? (
         <ActivityIndicator size="large" className="mt-10" />
