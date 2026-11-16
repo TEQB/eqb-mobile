@@ -34,6 +34,17 @@ export interface GroupMember {
   share_name: boolean;
 }
 
+export interface StudyGroupMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string | null;
+  type: string;
+  media_url: string | null;
+  reply_to_id: string | null;
+  created_at: string;
+}
+
 async function authedFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
@@ -78,6 +89,9 @@ export const studyGroupsApi = {
   detail: (groupId: string) =>
     authedFetch<{ group: StudyGroup; members: GroupMember[] }>(`/study-groups/${groupId}`),
 
+  messages: (groupId: string) =>
+    authedFetch<{ messages: StudyGroupMessage[] }>(`/study-groups/${groupId}/messages`),
+
   updatePrivacy: (groupId: string, privacy: { share_name: boolean }) =>
     authedFetch<{ success: boolean }>(`/study-groups/${groupId}`, {
       method: "PATCH",
@@ -102,7 +116,7 @@ export const studyGroupsApi = {
     media_url?: string | null;
     reply_to_id?: string | null;
   }) =>
-    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/messages`, {
+    authedFetch<{ success: boolean; message?: StudyGroupMessage }>(`/study-groups/${groupId}/messages`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),

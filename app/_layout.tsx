@@ -2,6 +2,7 @@ import "../src/globals.css";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AppProviders } from "@/providers/AppProviders";
+import { Announcements } from "@/components/Announcements";
 
 export default function RootLayout() {
   return (
@@ -16,7 +17,9 @@ export default function RootLayout() {
         <Stack.Screen name="group/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="group/course/[courseId]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="feedback" options={{ presentation: "modal" }} />
+        <Stack.Screen name="notifications" options={{ animation: "slide_from_right" }} />
       </Stack>
+      <Announcements />
     </AppProviders>
   );
 }

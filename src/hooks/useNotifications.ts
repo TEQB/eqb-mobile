@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -30,18 +30,43 @@ export function useNotifications(): UseNotificationsReturn {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Resolve profile ID
   useEffect(() => {
-    if (!user) { setProfileId(null); return; }
-    supabase
-      .from("profiles")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-      .then(({ data }) => setProfileId((data as any)?.id || null));
+    if (!user) {
+      setProfileId(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .single();
+        if (cancelled) return;
+        if (error || !data) {
+          setProfileId(null);
+          setLoading(false);
+        } else {
+          setProfileId((data as any).id);
+        }
+      } catch {
+        if (!cancelled) {
+          setProfileId(null);
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user]);
 
   const fetchNotifications = useCallback(async () => {
-    if (!profileId) return;
+    if (!profileId) {
+      setLoading(false);
+      return;
+    }
     const { data } = await supabase
       .from("notifications")
       .select("*")
@@ -55,8 +80,31 @@ export function useNotifications(): UseNotificationsReturn {
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
+
+    // Realtime subscription for instant updates
+    if (profileId) {
+      const channel = supabase
+        .channel(`notifications-${profileId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${profileId}`,
+          },
+          () => fetchNotifications(),
+        )
+        .subscribe();
+
+      return () => {
+        clearInterval(interval);
+        supabase.removeChannel(channel);
+      };
+    }
+
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, profileId]);
 
   const markRead = async (id: string) => {
     setNotifications((prev) =>

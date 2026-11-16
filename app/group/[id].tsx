@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, ActivityIndicator,
   KeyboardAvoidingView, Platform, Alert, Modal, ScrollView, Switch, Image,
@@ -23,8 +23,6 @@ interface Message {
   reply_to_id: string | null;
   created_at: string;
 }
-
-const MESSAGE_SELECT = "id, group_id, sender_id, content, type, media_url, reply_to_id, created_at";
 
 function uniqueMediaPath(groupId: string, ext: string) {
   return `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -72,6 +70,7 @@ export default function GroupChatScreen() {
   const [qrOpen, setQrOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const listRef = useRef<FlatList<Message>>(null);
 
   const { data: detail, isLoading, refetch } = useQuery({
     queryKey: ["study-group", id],
@@ -88,6 +87,15 @@ export default function GroupChatScreen() {
 
   const memberMap = useMemo(() => new Map<string, GroupMember>(members.map((m) => [m.profile_id, m])), [members]);
   const messageMap = useMemo(() => new Map<string, Message>(messages.map((m) => [m.id, m])), [messages]);
+
+  const upsertMessage = useCallback((msg: Message) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      return [...prev, msg].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+    });
+  }, []);
 
   const senderLabel = useCallback((senderId: string) => {
     const m = memberMap.get(senderId);
@@ -107,13 +115,8 @@ export default function GroupChatScreen() {
     let cancelled = false;
     (async () => {
       setLoadingMessages(true);
-      const { data } = await supabase
-        .from("study_group_messages")
-        .select(MESSAGE_SELECT)
-        .eq("group_id", id)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (!cancelled && data) setMessages(data as Message[]);
+      const res = await studyGroupsApi.messages(id!);
+      if (!cancelled) setMessages(res.messages as Message[]);
       setLoadingMessages(false);
     })();
     return () => { cancelled = true; };
@@ -129,17 +132,26 @@ export default function GroupChatScreen() {
         { event: "INSERT", schema: "public", table: "study_group_messages", filter: `group_id=eq.${id}` },
         (payload) => {
           const msg = payload.new as Message;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) return prev;
-            return [msg, ...prev];
-          });
+          upsertMessage(msg);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_members", filter: `group_id=eq.${id}` },
+        () => {
+          // Refresh group detail (members list) when someone joins/leaves
+          queryClient.invalidateQueries({ queryKey: ["study-group", id] });
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, supabase]);
+  }, [id, supabase, upsertMessage, queryClient]);
+
+  useEffect(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length, tab]);
 
   const sendMessage = async () => {
     const content = input.trim();
@@ -149,7 +161,8 @@ export default function GroupChatScreen() {
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
     try {
-      await studyGroupsApi.sendMessage(id!, { content, type: "text", reply_to_id: replyId });
+      const res = await studyGroupsApi.sendMessage(id!, { content, type: "text", reply_to_id: replyId });
+      if (res.message) upsertMessage(res.message as Message);
     } catch (err: any) {
       Alert.alert("Failed to send", err.message || "Please try again");
       setInput(content);
@@ -186,7 +199,8 @@ export default function GroupChatScreen() {
       });
       if (uploadError) throw uploadError;
 
-      await studyGroupsApi.sendMessage(id!, { type: "image", media_url: path, reply_to_id: replyTo?.id ?? null });
+      const res = await studyGroupsApi.sendMessage(id!, { type: "image", media_url: path, reply_to_id: replyTo?.id ?? null });
+      if (res.message) upsertMessage(res.message as Message);
       setReplyTo(null);
     } catch (err: any) {
       Alert.alert("Failed to send image", err.message || "Please try again");
@@ -354,6 +368,7 @@ export default function GroupChatScreen() {
       ) : tab === "chat" ? (
         <>
           <FlatList
+            ref={listRef}
             className="flex-1 px-4 pt-3"
             data={messages}
             keyExtractor={(item) => item.id}

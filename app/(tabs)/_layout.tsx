@@ -3,9 +3,8 @@ import { Alert } from "react-native";
 import { Tabs, useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Updates from "expo-updates";
-import { Home, Search, Upload, FileText, User, MessageCircle } from "lucide-react-native";
+import { Home, Search, Upload, FileText, MessageCircle } from "lucide-react-native";
 import AppHeader from "@/components/AppHeader";
-import { Announcements } from "@/components/Announcements";
 import { useLockStatus } from "@/hooks/useLockStatus";
 
 export default function TabLayout() {
@@ -59,7 +58,6 @@ export default function TabLayout() {
   };
 
   return (
-    <>
     <Tabs
       screenOptions={{
         header: () => <AppHeader />,
@@ -120,14 +118,8 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="profile/index"
-        listeners={blockIfLocked}
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }: any) => <User color={color} size={size} />,
-        }}
+        options={{ href: null }}
       />
     </Tabs>
-    <Announcements />
-    </>
   );
 }

@@ -7,51 +7,61 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { setPasswordSchema } from "@/lib/validations";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
+import { getPasswordStrength } from "@/lib/password";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react-native";
 
 type PasswordForm = { password: string; confirmPassword: string };
 
-const getStrength = (p: string): { label: string; color: string; width: string } => {
-  if (!p) return { label: "", color: "transparent", width: "0%" };
-  const score = [
-    p.length >= 8,
-    /[a-z]/.test(p) && /[A-Z]/.test(p),
-    /\d/.test(p),
-    /[^a-zA-Z0-9]/.test(p),
-  ].filter(Boolean).length;
-  if (score < 2) return { label: "Weak", color: "#DC2626", width: "25%" };
-  if (score < 3) return { label: "Fair", color: "#D4750A", width: "50%" };
-  if (score < 4) return { label: "Good", color: "#7A1030", width: "75%" };
-  return { label: "Strong", color: "#16a34a", width: "100%" };
-};
+const STRENGTH_COLORS = {
+  weak: "#DC2626",
+  medium: "#D4750A",
+  strong: "#16a34a",
+} as const;
+
+const STRENGTH_WIDTHS = {
+  weak: "33%",
+  medium: "66%",
+  strong: "100%",
+} as const;
 
 export default function SetPasswordScreen() {
   const router = useRouter();
-  const { email } = useLocalSearchParams<{ email: string }>();
+  const { email, matric } = useLocalSearchParams<{ email: string; matric?: string }>();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState("");
 
   const { control, handleSubmit, watch, formState: { errors } } = useForm<PasswordForm>({
-    resolver: zodResolver(setPasswordSchema),
+    resolver: zodResolver(setPasswordSchema) as any,
     defaultValues: { password: "", confirmPassword: "" },
   });
 
   const watchPassword = watch("password");
-  const strength = useMemo(() => getStrength(watchPassword), [watchPassword]);
+  const strength = useMemo(() => getPasswordStrength(watchPassword), [watchPassword]);
 
   const onSubmit = async (data: PasswordForm) => {
+    setError("");
     setLoading(true);
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.auth.updateUser({ password: data.password });
-      if (error) throw error;
+      await api.post("/api/auth/create-account", {
+        email,
+        password: data.password,
+      });
+
       Alert.alert("Account created!", "You can now sign in with your email and password.", [
-        { text: "Go to Login", onPress: () => router.replace("/(auth)/login") },
+        {
+          text: "Go to Login",
+          onPress: () => router.replace({
+            pathname: "/(auth)/login",
+            params: { confirmed: email },
+          }),
+        },
       ]);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to set password");
+      const msg = err.message?.replace(/^API \d+: /, "") || "Failed to create account";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -100,6 +110,7 @@ export default function SetPasswordScreen() {
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
+                        autoComplete="new-password"
                       />
                       <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
@@ -114,9 +125,17 @@ export default function SetPasswordScreen() {
                 {watchPassword.length > 0 && (
                   <View className="mt-1.5">
                     <View className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <View className="h-full rounded-full" style={{ backgroundColor: strength.color, width: strength.width }} />
+                      <View
+                        className="h-full rounded-full"
+                        style={{
+                          backgroundColor: STRENGTH_COLORS[strength],
+                          width: STRENGTH_WIDTHS[strength],
+                        }}
+                      />
                     </View>
-                    <Text className="text-xs mt-0.5" style={{ color: strength.color }}>{strength.label}</Text>
+                    <Text className="text-xs mt-0.5 capitalize" style={{ color: STRENGTH_COLORS[strength] }}>
+                      Strength: {strength}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -136,6 +155,7 @@ export default function SetPasswordScreen() {
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
+                        autoComplete="new-password"
                       />
                       <TouchableOpacity
                         onPress={() => setShowConfirm(!showConfirm)}
@@ -148,6 +168,8 @@ export default function SetPasswordScreen() {
                 />
                 {errors.confirmPassword && <Text className="text-destructive text-xs mt-1">{errors.confirmPassword.message}</Text>}
               </View>
+
+              {error ? <Text className="text-destructive text-sm">{error}</Text> : null}
 
               <TouchableOpacity
                 className="bg-primary py-4 rounded-xl items-center mt-2"

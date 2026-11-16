@@ -65,13 +65,29 @@ export default function HomeScreen() {
     queryKey: ["courses-for-programme", programmeId],
     queryFn: async () => {
       if (!programmeId) return [];
-      const { data, error } = await supabase
+
+      // Own courses: scope=general OR programme_id=own
+      const { data: ownCourses, error: ownErr } = await supabase
         .from("courses")
         .select("id, code, title, level, scope, programme_id")
         .or(`scope.eq.general,programme_id.eq.${programmeId}`)
         .order("level");
-      if (error) throw error;
-      return (data as StudentCourse[]) || [];
+      if (ownErr) throw ownErr;
+
+      // Linked shared courses via programme_courses
+      const { data: links, error: linksErr } = await supabase
+        .from("programme_courses")
+        .select("course_id, course:course_id(id, code, title, level, scope, programme_id)")
+        .eq("programme_id", programmeId);
+      if (linksErr) throw linksErr;
+
+      const linkedIds = new Set((links as any[] | null)?.map((l) => l.course_id) || []);
+      const ownList = ((ownCourses as StudentCourse[] | null) || []).filter((c) => !linkedIds.has(c.id));
+      const linkedList = ((links as any[] | null) || [])
+        .map((l) => l.course as StudentCourse)
+        .filter(Boolean);
+
+      return [...ownList, ...linkedList].sort((a, b) => a.level - b.level);
     },
     enabled: !!programmeId,
   });

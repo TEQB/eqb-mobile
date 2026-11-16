@@ -22,7 +22,7 @@ export default function LoginScreen() {
 
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error, data: authData } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     });
@@ -31,6 +31,23 @@ export default function LoginScreen() {
       Alert.alert("Login failed", error.message);
       return;
     }
+
+    // Verify the user is a student (not admin)
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("auth_user_id", authData.user.id)
+        .single();
+
+      const role = (profile as { role: string } | null)?.role;
+      if (role !== "student") {
+        await supabase.auth.signOut();
+        Alert.alert("Login failed", "This account does not have student access.");
+        return;
+      }
+    }
+
     router.replace("/(tabs)/home");
   };
 

@@ -19,7 +19,7 @@ export function useFeedbackCount() {
       const { count } = await supabase
         .from("feedback_messages")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", (profile as any).id)
+        .eq("profile_id", profile.id)
         .eq("is_read", false);
       setFeedbackCount(count ?? 0);
     }

@@ -37,6 +37,29 @@ export default function CourseGroupsScreen() {
 
   const groups = data?.groups ?? [];
   const canCreate = groups.length < 2;
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+
+  const handleGroupPress = async (g: { id: string; name: string; is_member?: boolean; invite_code?: string }) => {
+    if (g.is_member) {
+      router.push(`/group/${g.id}`);
+      return;
+    }
+    if (!g.invite_code) {
+      Alert.alert("Error", "Invite code unavailable for this group.");
+      return;
+    }
+    setJoiningId(g.id);
+    try {
+      await studyGroupsApi.join(g.invite_code);
+      queryClient.invalidateQueries({ queryKey: ["study-groups-course", courseId] });
+      queryClient.invalidateQueries({ queryKey: ["study-groups-mine"] });
+      router.push(`/group/${g.id}`);
+    } catch (err: any) {
+      Alert.alert("Could not join", err.message || "Please try again");
+    } finally {
+      setJoiningId(null);
+    }
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -93,10 +116,15 @@ export default function CourseGroupsScreen() {
                 key={g.id}
                 className="bg-white/90 rounded-2xl p-4 flex-row items-center shadow-sm"
                 style={{ shadowColor: "rgba(63,39,50,0.06)", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12 }}
-                onPress={() => router.push(`/group/${g.id}`)}
+                onPress={() => handleGroupPress(g)}
+                disabled={joiningId === g.id}
               >
                 <View className="w-11 h-11 bg-primary/10 rounded-xl items-center justify-center">
-                  <MessageCircle size={20} color="#7A1030" />
+                  {joiningId === g.id ? (
+                    <ActivityIndicator size="small" color="#7A1030" />
+                  ) : (
+                    <MessageCircle size={20} color="#7A1030" />
+                  )}
                 </View>
                 <View className="flex-1 ml-3">
                   <Text className="text-foreground font-semibold" numberOfLines={1}>{g.name}</Text>
@@ -106,9 +134,13 @@ export default function CourseGroupsScreen() {
                   <View className="flex-row items-center gap-2 mt-1">
                     <Users size={12} color="#9CA3AF" />
                     <Text className="text-muted-foreground text-xs">{g.member_count ?? 0} members</Text>
-                    {g.is_member && (
+                    {g.is_member ? (
                       <View className="bg-primary/10 rounded-full px-2 py-0.5">
                         <Text className="text-primary text-[10px] font-semibold">Joined</Text>
+                      </View>
+                    ) : (
+                      <View className="bg-secondary/10 rounded-full px-2 py-0.5">
+                        <Text className="text-secondary text-[10px] font-semibold">Join</Text>
                       </View>
                     )}
                   </View>

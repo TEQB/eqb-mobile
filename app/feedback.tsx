@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import { api } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { MessageSquare } from "lucide-react-native";
@@ -17,21 +18,34 @@ export default function FeedbackScreen() {
       Alert.alert("Too short", "Please write at least 10 characters");
       return;
     }
+    if (message.length > 2000) {
+      Alert.alert("Too long", "Please keep feedback under 2000 characters");
+      return;
+    }
 
     setSending(true);
     try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("auth_user_id", user!.id)
-        .single();
+      // Get access token for Bearer auth
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        Alert.alert("Error", "Please log in again.");
+        return;
+      }
 
-      const { error } = await supabase.from("feedback_messages").insert({
-        message,
-        profile_id: (profile as any)?.id,
-      } as any);
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || "https://www.eqb.info"}/api/feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as any)?.error || `Request failed (${res.status})`);
+      }
 
       Alert.alert("Thank you!", "Your feedback has been submitted.", [
         { text: "OK", onPress: () => router.back() },
@@ -67,6 +81,7 @@ export default function FeedbackScreen() {
           textAlignVertical="top"
           value={message}
           onChangeText={setMessage}
+          maxLength={2000}
         />
         <Text className="text-gray-400 text-sm mt-1 text-right">
           {message.length}/2000

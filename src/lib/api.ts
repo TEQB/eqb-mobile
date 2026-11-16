@@ -22,10 +22,21 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
     headers: { "Content-Type": "application/json", ...fetchOptions.headers },
   });
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
+    const text = await res.text();
+    let msg = text.slice(0, 200);
+    try {
+      const json = JSON.parse(text);
+      if (json?.error) msg = json.error;
+    } catch {
+      // not JSON, use raw text
+    }
+    throw new Error(msg || `Request failed (${res.status})`);
   }
-  return res.json();
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+  return {} as T;
 }
 
 export const api = {

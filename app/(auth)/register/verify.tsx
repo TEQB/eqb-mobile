@@ -1,58 +1,117 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
   Alert, ActivityIndicator, ScrollView, Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
 import { ArrowLeft } from "lucide-react-native";
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
-  const { email, fullName } = useLocalSearchParams<{ email: string; fullName: string }>();
-  const [code, setCode] = useState("");
+  const { email } = useLocalSearchParams<{ email: string }>();
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [timeLeft, setTimeLeft] = useState(600);
+  const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
+  const [error, setError] = useState("");
+  const inputRefs = useRef<any[]>([]);
 
-  const handleVerify = async () => {
-    if (code.length !== 6) {
-      Alert.alert("Invalid code", "Please enter the 6-digit code sent to your email");
+  // Countdown timer
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      setCanResend(true);
       return;
     }
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  // Auto-verify when all 6 digits entered
+  useEffect(() => {
+    if (otp.every((d) => d !== "")) {
+      handleVerify();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp]);
+
+  const handleChange = (index: number, value: string) => {
+    // Only allow digits
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const newOtp = [...otp];
+    newOtp[index] = digit;
+    setOtp(newOtp);
+
+    if (digit && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (index: number, key: string) => {
+    if (key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerify = async () => {
+    const code = otp.join("");
+    if (code.length !== 6) return;
     setLoading(true);
+    setError("");
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.auth.verifyOtp({
-        email: email!,
-        token: code,
-        type: "signup",
-      });
-      if (error) throw error;
-      router.push({
-        pathname: "/(auth)/register/set-password",
-        params: { email },
-      });
+      const res = await api.post<{ success: boolean; hasPendingRegistration: boolean; registration: any }>(
+        "/api/auth/verify-otp",
+        { email, code },
+      );
+
+      if (res.hasPendingRegistration) {
+        const params: Record<string, string> = { email };
+        if (res.registration?.matricNumber) {
+          params.matric = res.registration.matricNumber;
+        }
+        router.push({
+          pathname: "/(auth)/register/set-password",
+          params,
+        });
+      } else {
+        router.push({
+          pathname: "/(auth)/login",
+          params: { verified: email },
+        });
+      }
     } catch (err: any) {
-      Alert.alert("Verification failed", err.message || "Invalid code");
+      const msg = err.message?.replace(/^API \d+: /, "") || "Invalid or expired code";
+      setError(msg);
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
   };
 
   const resendCode = async () => {
-    setResending(true);
+    if (!canResend) return;
+    setCanResend(false);
+    setTimeLeft(600);
+    setOtp(["", "", "", "", "", ""]);
+    setError("");
+    inputRefs.current[0]?.focus();
+
     try {
-      const supabase = getSupabaseClient();
-      await supabase.auth.signInWithOtp({
-        email: email!,
-        options: { data: { full_name: fullName } },
-      });
+      // Re-send OTP — the API will look up pending_registrations for this email
+      await api.post("/api/auth/send-otp", { email });
       Alert.alert("Code resent", "Please check your email for a new verification code.");
     } catch {
       Alert.alert("Error", "Failed to resend code");
-    } finally {
-      setResending(false);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -84,38 +143,47 @@ export default function VerifyOtpScreen() {
             </View>
 
             <View className="gap-4">
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-1.5">Verification Code</Text>
-                <TextInput
-                  className="h-14 rounded-xl border border-input bg-white px-4 text-foreground text-center text-2xl tracking-[0.3em]"
-                  placeholder="000000"
-                  placeholderTextColor="#D1C5BD"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={code}
-                  onChangeText={setCode}
-                />
+              {/* OTP inputs */}
+              <View className="flex-row justify-center gap-2">
+                {otp.map((digit, i) => (
+                  <TextInput
+                    key={i}
+                    ref={(ref) => { inputRefs.current[i] = ref; }}
+                    className="h-14 w-12 rounded-xl border border-input bg-white px-2 text-center text-xl font-semibold text-foreground"
+                    style={digit ? { borderColor: "#D4750A", borderWidth: 2 } : undefined}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    value={digit}
+                    onChangeText={(v) => handleChange(i, v)}
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(i, nativeEvent.key)}
+                    selectTextOnFocus
+                  />
+                ))}
               </View>
 
-              <TouchableOpacity
-                className="bg-primary py-4 rounded-xl items-center mt-2"
-                onPress={handleVerify}
-                disabled={loading || code.length !== 6}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
+              {/* Timer */}
+              <Text className="text-center text-sm text-muted-foreground">
+                {timeLeft > 0 ? (
+                  <>Code expires in <Text className="font-medium text-foreground">{formatTime(timeLeft)}</Text></>
                 ) : (
-                  <Text className="text-primary-foreground font-semibold text-base">Verify Code</Text>
+                  "Code expired"
                 )}
-              </TouchableOpacity>
+              </Text>
 
-              <TouchableOpacity className="items-center py-1" onPress={resendCode} disabled={resending}>
-                {resending ? (
-                  <ActivityIndicator size="small" color="#D4750A" />
-                ) : (
+              {error ? <Text className="text-center text-sm text-destructive">{error}</Text> : null}
+
+              {loading && (
+                <View className="items-center">
+                  <ActivityIndicator color="#7A1030" />
+                  <Text className="text-sm text-muted-foreground mt-1">Verifying...</Text>
+                </View>
+              )}
+
+              {canResend && (
+                <TouchableOpacity className="items-center py-1" onPress={resendCode}>
                   <Text className="text-sm font-medium text-secondary">Resend code</Text>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              )}
             </View>
 
             <TouchableOpacity

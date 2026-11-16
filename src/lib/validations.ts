@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validatePassword } from "./password";
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -8,7 +9,13 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   fullName: z.string().min(2).max(100),
   email: z.string().email(),
-  matricNumber: z.string().optional(),
+  matricNumber: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z
+      .string()
+      .regex(/^125\/\d{2}\/[12]\/\d{4}$/, "Format: 125/XX/Y/ZZZZ (e.g. 125/23/1/0056)")
+      .optional(),
+  ),
   facultyId: z.string().uuid(),
   programmeId: z.string().uuid(),
   currentLevel: z.preprocess(
@@ -20,8 +27,18 @@ export const registerSchema = z.object({
 export const setPasswordSchema = z
   .object({
     email: z.string().email().optional(),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    matricNumber: z.string().optional(),
+    password: z.string().min(1, "Password is required"),
     confirmPassword: z.string().min(1),
+  })
+  .superRefine((data, ctx) => {
+    const result = validatePassword(data.password, {
+      email: data.email,
+      matricNumber: data.matricNumber,
+    });
+    if (!result.valid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: result.error, path: ["password"] });
+    }
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -31,6 +48,22 @@ export const setPasswordSchema = z
 export const verifyOtpSchema = z.object({
   email: z.string().email(),
   code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+});
+
+export const sendOtpSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(2).max(100).optional(),
+  matricNumber: z.string().regex(/^125\/\d{2}\/[12]\/\d{4}$/, "Format: 125/XX/Y/ZZZZ").optional(),
+  programmeId: z.string().uuid().optional(),
+  currentLevel: z.preprocess(
+    (v) => (v ? Number(v) : v),
+    z.number().int().min(100).max(600).optional(),
+  ),
+});
+
+export const createAccountSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
 });
 
 export const uploadSchema = z.object({
@@ -44,7 +77,7 @@ export const uploadSchema = z.object({
 });
 
 export const solutionSchema = z.object({
-  body: z.string().min(1).optional().or(z.literal("")),
+  body: z.string().min(1, "Solution text is required").optional().or(z.literal("")),
 });
 
 export const feedbackSchema = z.object({

@@ -2,6 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from
 import { useRouter } from "expo-router";
 import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import { mapNotificationLink } from "@/lib/notificationLinks";
 import { Bell, ChevronLeft } from "lucide-react-native";
 
 export default function NotificationsScreen() {
@@ -10,8 +11,9 @@ export default function NotificationsScreen() {
 
   const handlePress = async (notification: any) => {
     if (!notification.is_read) await markRead(notification.id);
-    if (notification.link) {
-      router.push(notification.link as any);
+    const mappedLink = mapNotificationLink(notification.link);
+    if (mappedLink) {
+      router.push(mappedLink as any);
     }
   };
 

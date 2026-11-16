@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
   Alert, ActivityIndicator, ScrollView, Image,
@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema } from "@/lib/validations";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getUniversityEmailDomain } from "@/lib/env";
+import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react-native";
 
@@ -21,15 +22,14 @@ type RegisterForm = {
   currentLevel: number;
 };
 
-const LEVELS = [100, 200, 300, 400, 500, 600];
-
 export default function RegisterScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema) as any,
-    defaultValues: { fullName: "", email: "", matricNumber: "", facultyId: "", programmeId: "", currentLevel: 100 },
+    defaultValues: { fullName: "", email: "", matricNumber: "", facultyId: "", programmeId: "", currentLevel: 0 },
   });
 
   const watchFacultyId = watch("facultyId");
@@ -68,17 +68,33 @@ export default function RegisterScreen() {
   const { data: allProgrammes } = useQuery({
     queryKey: ["programmes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("programmes").select("id, name, faculty_id").order("name");
+      const { data, error } = await supabase
+        .from("programmes")
+        .select("id, name, faculty_id, available_levels")
+        .order("name");
       if (error) throw error;
-      return data as { id: string; name: string; faculty_id: string }[];
+      return data as { id: string; name: string; faculty_id: string; available_levels: number[] }[];
     },
     enabled: !!watchFacultyId,
   });
 
   const filteredProgrammes = allProgrammes?.filter((p) => p.faculty_id === watchFacultyId) || [];
 
+  // Get available levels for the selected programme
+  const selectedProgramme = allProgrammes?.find((p) => p.id === watchProgrammeId);
+  const availableLevels = selectedProgramme?.available_levels ?? [];
+
+  // Reset level when programme changes
+  useEffect(() => {
+    if (watchProgrammeId) {
+      setValue("currentLevel", 0);
+    }
+  }, [watchProgrammeId, setValue]);
+
   const onSubmit = async (data: RegisterForm) => {
+    setError("");
     const isOpen = openRegistrationLevels.includes(data.currentLevel);
+
     if (!isOpen && !data.matricNumber?.trim()) {
       Alert.alert("Matric number required", "Please enter your matric number.");
       return;
@@ -90,28 +106,25 @@ export default function RegisterScreen() {
         return;
       }
     }
+
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      await api.post("/api/auth/send-otp", {
         email: data.email,
-        options: {
-          data: {
-            full_name: data.fullName,
-            matric_number: data.matricNumber || undefined,
-            programme_id: data.programmeId,
-            current_level: data.currentLevel,
-          },
-        },
+        fullName: data.fullName,
+        matricNumber: data.matricNumber || undefined,
+        programmeId: data.programmeId,
+        currentLevel: data.currentLevel,
       });
-
-      if (error) throw error;
 
       router.push({
         pathname: "/(auth)/register/verify",
-        params: { email: data.email, fullName: data.fullName },
+        params: { email: data.email },
       });
     } catch (err: any) {
-      Alert.alert("Registration failed", err.message || "Please try again");
+      const msg = err.message?.replace(/^API \d+: /, "") || "Registration failed";
+      setError(msg);
+      Alert.alert("Registration failed", msg);
     } finally {
       setLoading(false);
     }
@@ -201,7 +214,7 @@ export default function RegisterScreen() {
 
               <View>
                 <Text className="text-sm font-semibold text-foreground mb-1.5">
-                  Matric Number{isOpenLevel ? " (optional)" : ""}
+                  Matric Number{isOpenLevel ? " (optional)" : " *"}
                 </Text>
                 <Controller
                   control={control}
@@ -270,38 +283,42 @@ export default function RegisterScreen() {
                             ))}
                           </View>
                         ) : (
-                          <ActivityIndicator size="small" />
+                          <Text className="text-sm text-muted-foreground">No programmes found</Text>
                         )}
                       </ScrollView>
                       {errors.programmeId && <Text className="text-destructive text-xs mt-1">{errors.programmeId.message}</Text>}
                     </View>
                   ) : null}
 
-                  <View>
-                    <Text className="text-sm font-semibold text-foreground mb-1.5">Current Level</Text>
-                    {watchFacultyId ? (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View className="flex-row gap-2">
-                          {LEVELS.map((level) => (
-                            <TouchableOpacity
-                              key={level}
-                              className={`px-5 py-2.5 rounded-full ${watchCurrentLevel === level ? "bg-primary" : "bg-muted"}`}
-                              onPress={() => setValue("currentLevel", level)}
-                            >
-                              <Text className={watchCurrentLevel === level ? "text-primary-foreground font-medium text-sm" : "text-foreground text-sm"}>
-                                {level}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </ScrollView>
-                    ) : (
-                      <Text className="text-sm text-muted-foreground">Select a faculty and programme first</Text>
-                    )}
-                    {errors.currentLevel && <Text className="text-destructive text-xs mt-1">{errors.currentLevel.message}</Text>}
-                  </View>
+                  {watchProgrammeId ? (
+                    <View>
+                      <Text className="text-sm font-semibold text-foreground mb-1.5">Current Level</Text>
+                      {availableLevels.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View className="flex-row gap-2">
+                            {availableLevels.map((level) => (
+                              <TouchableOpacity
+                                key={level}
+                                className={`px-5 py-2.5 rounded-full ${watchCurrentLevel === level ? "bg-primary" : "bg-muted"}`}
+                                onPress={() => setValue("currentLevel", level)}
+                              >
+                                <Text className={watchCurrentLevel === level ? "text-primary-foreground font-medium text-sm" : "text-foreground text-sm"}>
+                                  {level} Level
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      ) : (
+                        <Text className="text-sm text-muted-foreground">No levels available for this programme</Text>
+                      )}
+                      {errors.currentLevel && <Text className="text-destructive text-xs mt-1">{errors.currentLevel.message}</Text>}
+                    </View>
+                  ) : null}
                 </View>
               </View>
+
+              {error ? <Text className="text-destructive text-sm">{error}</Text> : null}
 
               <TouchableOpacity
                 className="bg-primary py-4 rounded-xl items-center mt-2"
