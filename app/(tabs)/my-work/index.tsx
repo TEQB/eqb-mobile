@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, SectionList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
@@ -51,6 +52,23 @@ export default function MyWorkScreen() {
     },
     enabled: !!profile,
   });
+
+  // Realtime subscriptions for my contributions
+  useEffect(() => {
+    if (!profile?.id) return;
+    const channel = supabase
+      .channel(`my-work-${profile.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `uploaded_by=eq.${profile.id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["contributions", profile.id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "solutions", filter: `submitted_by=eq.${profile.id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["my-solutions", profile.id] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, supabase, queryClient]);
 
   const statusColors: Record<string, string> = {
     published: "text-green-600",

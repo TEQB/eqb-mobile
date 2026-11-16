@@ -1,9 +1,9 @@
-import { useState, useRef, type ComponentRef } from "react";
+import { useState, useRef, useEffect, type ComponentRef } from "react";
 import {
   View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Dimensions, Image, Alert, Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getApiBaseUrl } from "@/lib/env";
 import {
@@ -13,6 +13,7 @@ import { Paths, File } from "expo-file-system";
 import { SolutionList } from "@/components/solutions/SolutionList";
 import { SolutionForm } from "@/components/solutions/SolutionForm";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLockGuard } from "@/hooks/useLockGuard";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -30,7 +31,9 @@ export default function QuestionDetailScreen() {
   const supabase = getSupabaseClient();
   const { user } = useAuth();
   const API_BASE = getApiBaseUrl();
+  const queryClient = useQueryClient();
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useLockGuard();
 
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagReason, setFlagReason] = useState("");
@@ -111,6 +114,30 @@ export default function QuestionDetailScreen() {
     },
     enabled: !!id,
   });
+
+  // Realtime subscriptions for question, solutions, and pages
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`question-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["question", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "solutions", filter: `question_id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["solutions", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "past_question_pages", filter: `question_id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["question-pages", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "solution_votes", filter: `solution_id=in.(select id from solutions where question_id='${id}')` }, () => {
+        // Vote counts change — refetch solutions
+        queryClient.invalidateQueries({ queryKey: ["solutions", id] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, supabase, queryClient]);
 
   const handleDownload = async () => {
     if (!question) return;

@@ -1,8 +1,11 @@
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { useState } from "react";
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { getApiBaseUrl } from "@/lib/env";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import { VoteButtons } from "./VoteButtons";
 import { RatingStars } from "./RatingStars";
 import { FileText } from "lucide-react-native";
+import { Paths, File } from "expo-file-system";
 import * as WebBrowser from "expo-web-browser";
 
 interface SolutionCardProps {
@@ -35,10 +38,50 @@ export function SolutionCard({
   userRating,
 }: SolutionCardProps) {
   const API_BASE = getApiBaseUrl();
+  const supabase = getSupabaseClient();
+  const [opening, setOpening] = useState(false);
 
   const openFile = async () => {
-    if (fileUrl) {
-      await WebBrowser.openBrowserAsync(`${API_BASE}/api/storage/${fileUrl}`);
+    if (!fileUrl || opening) return;
+    setOpening(true);
+    try {
+      const fileUrlStr = `${API_BASE}/api/storage/${fileUrl}`;
+      const isImage = /\.(jpg|jpeg|png)$/i.test(fileUrlStr);
+
+      if (isImage) {
+        // For images, open directly in browser (approved bucket doesn't need auth)
+        // But solutions bucket needs Bearer auth — download first
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) {
+          Alert.alert("Error", "Please log in again.");
+          return;
+        }
+        const destFile = new File(Paths.cache, `solution-${id}.${fileUrl.split(".").pop()}`);
+        const downloaded = await File.downloadFileAsync(fileUrlStr, destFile, {
+          idempotent: true,
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        await WebBrowser.openBrowserAsync(downloaded.uri);
+      } else {
+        // For PDFs, download and open
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) {
+          Alert.alert("Error", "Please log in again.");
+          return;
+        }
+        const destFile = new File(Paths.cache, `solution-${id}.pdf`);
+        const downloaded = await File.downloadFileAsync(fileUrlStr, destFile, {
+          idempotent: true,
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        await WebBrowser.openBrowserAsync(downloaded.uri);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to open attachment");
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -60,10 +103,17 @@ export function SolutionCard({
           {fileUrl && (
             <TouchableOpacity
               onPress={openFile}
+              disabled={opening}
               className="flex-row items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 mb-2"
             >
-              <FileText size={16} className="text-gray-500" />
-              <Text className="text-sm text-gray-700">View attachment</Text>
+              {opening ? (
+                <ActivityIndicator size="small" color="#6B7280" />
+              ) : (
+                <FileText size={16} className="text-gray-500" />
+              )}
+              <Text className="text-sm text-gray-700">
+                {opening ? "Opening..." : "View attachment"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>

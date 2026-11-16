@@ -57,12 +57,14 @@ export default function UploadTabScreen() {
   const queryClient = useQueryClient();
   const { data: lockInfo } = useLockStatus();
 
-  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [courseId, setCourseId] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [semester, setSemester] = useState<"first" | "second">("first");
   const [examType, setExamType] = useState<"mid_semester" | "examination">("examination");
   const [uploading, setUploading] = useState(false);
+
+  const MAX_PAGES = 6;
 
   // Load profile to get programme_id and current_level
   const { data: profile } = useQuery({
@@ -131,6 +133,10 @@ export default function UploadTabScreen() {
   const selectedCourse = courses?.find((c) => c.id === courseId);
 
   const pickFromCamera = async () => {
+    if (selectedFiles.length >= MAX_PAGES) {
+      Alert.alert("Limit reached", `Maximum ${MAX_PAGES} pages allowed`);
+      return;
+    }
     const result = await ImagePicker.launchCameraAsync({
       quality: 0.8,
       mediaTypes: ["images"],
@@ -143,38 +149,53 @@ export default function UploadTabScreen() {
         Alert.alert("Invalid file", err);
         return;
       }
-      setSelectedFile({
+      setSelectedFiles((prev) => [...prev, {
         uri: asset.uri,
         name: asset.fileName || `photo-${Date.now()}.jpg`,
         mimeType,
         size: asset.fileSize,
-      });
+      }]);
     }
   };
 
   const pickFromGallery = async () => {
+    if (selectedFiles.length >= MAX_PAGES) {
+      Alert.alert("Limit reached", `Maximum ${MAX_PAGES} pages allowed`);
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       quality: 0.8,
       mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PAGES - selectedFiles.length,
     });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType || "image/jpeg";
-      const err = validateFile(mimeType, asset.fileSize);
-      if (err) {
-        Alert.alert("Invalid file", err);
-        return;
+    if (!result.canceled && result.assets.length > 0) {
+      const newFiles: SelectedFile[] = [];
+      for (const asset of result.assets) {
+        const mimeType = asset.mimeType || "image/jpeg";
+        const err = validateFile(mimeType, asset.fileSize);
+        if (err) {
+          Alert.alert("Invalid file", `${asset.fileName || "File"}: ${err}`);
+          continue;
+        }
+        newFiles.push({
+          uri: asset.uri,
+          name: asset.fileName || `photo-${Date.now()}.jpg`,
+          mimeType,
+          size: asset.fileSize,
+        });
       }
-      setSelectedFile({
-        uri: asset.uri,
-        name: asset.fileName || `photo-${Date.now()}.jpg`,
-        mimeType,
-        size: asset.fileSize,
-      });
+      if (newFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...newFiles].slice(0, MAX_PAGES));
+      }
     }
   };
 
   const pickDocument = async () => {
+    if (selectedFiles.length >= MAX_PAGES) {
+      Alert.alert("Limit reached", `Maximum ${MAX_PAGES} pages allowed`);
+      return;
+    }
     const result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/jpeg", "image/png"],
       copyToCacheDirectory: true,
@@ -187,18 +208,22 @@ export default function UploadTabScreen() {
         Alert.alert("Invalid file", err);
         return;
       }
-      setSelectedFile({
+      setSelectedFiles((prev) => [...prev, {
         uri: asset.uri,
         name: asset.name,
         mimeType,
         size: asset.size,
-      });
+      }]);
     }
   };
 
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile || !courseId || !year || !selectedCourse) {
-      Alert.alert("Missing fields", "Please select a file, course, and year");
+    if (selectedFiles.length === 0 || !courseId || !year || !selectedCourse) {
+      Alert.alert("Missing fields", "Please select at least one file, course, and year");
       return;
     }
 
@@ -216,27 +241,32 @@ export default function UploadTabScreen() {
 
     setUploading(true);
     let questionId: string | null = null;
-    let uploadedPath: string | null = null;
+    const uploadedPaths: string[] = [];
 
     try {
-      // Generate UUID for the question
       questionId = generateUUID();
 
-      const fileType = getFileType(selectedFile.mimeType);
-      const ext = fileType === "pdf" ? "pdf" : (selectedFile.name.split(".").pop() || "jpg");
-      const filePath = `pending/${questionId}/page-1.${ext}`;
+      // Upload all files
+      const uploadedPages: { pageNumber: number; filePath: string; fileType: string }[] = [];
 
-      // Read file and upload to Supabase storage
-      const file = new File(selectedFile.uri);
-      const fileBytes = await file.base64();
-      const fileBuffer = Uint8Array.from(atob(fileBytes!), (c: string) => c.charCodeAt(0));
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const fileType = getFileType(file.mimeType);
+        const ext = fileType === "pdf" ? "pdf" : (file.name.split(".").pop() || "jpg");
+        const filePath = `pending/${questionId}/page-${i + 1}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("pending")
-        .upload(filePath, fileBuffer, { contentType: selectedFile.mimeType });
+        const fileObj = new File(file.uri);
+        const fileBytes = await fileObj.base64();
+        const fileBuffer = Uint8Array.from(atob(fileBytes!), (c: string) => c.charCodeAt(0));
 
-      if (uploadError) throw uploadError;
-      uploadedPath = filePath;
+        const { error: uploadError } = await supabase.storage
+          .from("pending")
+          .upload(filePath, fileBuffer, { contentType: file.mimeType });
+
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(filePath);
+        uploadedPages.push({ pageNumber: i + 1, filePath, fileType });
+      }
 
       // Insert into past_questions
       const { error: insertError } = await supabase
@@ -246,8 +276,8 @@ export default function UploadTabScreen() {
           course_id: courseId,
           uploaded_by: profile.id,
           level: selectedCourse.level,
-          file_url: filePath,
-          file_type: fileType,
+          file_url: uploadedPages[0].filePath,
+          file_type: uploadedPages[0].fileType,
           year: yearNum,
           semester,
           exam_type: examType,
@@ -257,19 +287,20 @@ export default function UploadTabScreen() {
       if (insertError) throw insertError;
 
       // Insert into past_question_pages
+      const pagesToInsert = uploadedPages.map((p) => ({
+        question_id: questionId!,
+        page_number: p.pageNumber,
+        file_url: p.filePath,
+        file_type: p.fileType,
+      }));
+
       const { error: pagesError } = await supabase
         .from("past_question_pages")
-        .insert({
-          question_id: questionId,
-          page_number: 1,
-          file_url: filePath,
-          file_type: fileType,
-        } as any);
+        .insert(pagesToInsert as any);
 
       if (pagesError) {
-        // Rollback: delete the question and file
         await supabase.from("past_questions").delete().eq("id", questionId);
-        await supabase.storage.from("pending").remove([filePath]);
+        await supabase.storage.from("pending").remove(uploadedPaths);
         throw new Error("Failed to save pages. Please try again.");
       }
 
@@ -301,19 +332,18 @@ export default function UploadTabScreen() {
         Alert.alert("Needs review", result.reason || "Your question is pending review.");
       }
 
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setCourseId("");
       setYear(String(new Date().getFullYear()));
       setSemester("first");
       setExamType("examination");
       setSelectedLevel(null);
     } catch (err: any) {
-      // Cleanup on error
       if (questionId) {
         await supabase.from("past_questions").delete().eq("id", questionId);
       }
-      if (uploadedPath) {
-        await supabase.storage.from("pending").remove([uploadedPath]);
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from("pending").remove(uploadedPaths);
       }
       Alert.alert("Upload failed", err.message || "Something went wrong");
     } finally {
@@ -372,29 +402,40 @@ export default function UploadTabScreen() {
           </View>
         )}
 
-        {/* File picker */}
-        {selectedFile ? (
-          <View className="bg-white/90 rounded-2xl p-4 flex-row items-center">
-            {selectedFile.mimeType === "application/pdf" ? (
-              <FileText size={32} color="#7A1030" />
-            ) : (
-              <Image source={{ uri: selectedFile.uri }} className="w-12 h-12 rounded-xl" />
-            )}
-            <View className="flex-1 ml-3">
-              <Text className="text-foreground" numberOfLines={1}>{selectedFile.name}</Text>
-              {selectedFile.size && (
-                <Text className="text-xs text-muted-foreground mt-0.5">
-                  {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
-                </Text>
-              )}
+        {/* File picker — multi-page support */}
+        <View>
+          <Text className="text-sm font-semibold text-foreground mb-2">
+            Pages {selectedFiles.length > 0 && `(${selectedFiles.length}/${MAX_PAGES})`}
+          </Text>
+
+          {selectedFiles.length > 0 && (
+            <View className="gap-2 mb-3">
+              {selectedFiles.map((file, index) => (
+                <View key={`${file.uri}-${index}`} className="bg-white/90 rounded-2xl p-3 flex-row items-center">
+                  {file.mimeType === "application/pdf" ? (
+                    <FileText size={28} color="#7A1030" />
+                  ) : (
+                    <Image source={{ uri: file.uri }} className="w-10 h-10 rounded-xl" />
+                  )}
+                  <View className="flex-1 ml-3">
+                    <Text className="text-foreground text-sm font-medium" numberOfLines={1}>
+                      Page {index + 1}: {file.name}
+                    </Text>
+                    {file.size && (
+                      <Text className="text-xs text-muted-foreground mt-0.5">
+                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity className="p-1" onPress={() => removeFile(index)}>
+                    <X size={18} color="#6C5560" />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
-            <TouchableOpacity className="p-1" onPress={() => setSelectedFile(null)}>
-              <X size={20} color="#6C5560" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View>
-            <Text className="text-sm font-semibold text-foreground mb-2">File</Text>
+          )}
+
+          {selectedFiles.length < MAX_PAGES && (
             <View className="flex-row gap-3">
               <TouchableOpacity className="flex-1 bg-white/90 p-4 rounded-2xl items-center" onPress={pickFromCamera}>
                 <Camera size={28} color="#7A1030" />
@@ -409,11 +450,11 @@ export default function UploadTabScreen() {
                 <Text className="text-foreground text-sm font-medium mt-2">PDF</Text>
               </TouchableOpacity>
             </View>
-            <Text className="text-xs text-muted-foreground mt-2 text-center">
-              PDF, JPG, or PNG — max 10MB
-            </Text>
-          </View>
-        )}
+          )}
+          <Text className="text-xs text-muted-foreground mt-2 text-center">
+            PDF, JPG, or PNG — max 10MB per page · up to {MAX_PAGES} pages
+          </Text>
+        </View>
 
         {/* Course selector — filtered by programme */}
         {courses && courses.length > 0 && (
@@ -511,7 +552,7 @@ export default function UploadTabScreen() {
         </View>
 
         {/* Upload button */}
-        {selectedFile && courseId && year && selectedCourse && (
+        {selectedFiles.length > 0 && courseId && year && selectedCourse && (
           <TouchableOpacity
             className="bg-primary py-4 rounded-2xl items-center mt-2"
             onPress={handleUpload}

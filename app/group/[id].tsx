@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { studyGroupsApi, type GroupMember } from "@/lib/studyGroups";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useLockGuard } from "@/hooks/useLockGuard";
 import QRCode from "react-native-qrcode-svg";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -60,6 +61,7 @@ export default function GroupChatScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const supabase = getSupabaseClient();
+  useLockGuard();
 
   const [tab, setTab] = useState<"chat" | "members">("chat");
   const [messages, setMessages] = useState<Message[]>([]);

@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { studyGroupsApi } from "@/lib/studyGroups";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useLockGuard } from "@/hooks/useLockGuard";
 import { MessageCircle, Plus, Users, ChevronRight, X } from "lucide-react-native";
 
 export default function CourseGroupsScreen() {
@@ -14,6 +15,7 @@ export default function CourseGroupsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const supabase = getSupabaseClient();
+  useLockGuard();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");

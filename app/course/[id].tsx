@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { MessageCircle } from "lucide-react-native";
+import { useLockGuard } from "@/hooks/useLockGuard";
 
 interface Course {
   id: string;
@@ -23,6 +25,8 @@ export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const supabase = getSupabaseClient();
+  const queryClient = useQueryClient();
+  useLockGuard();
 
   const { data: course } = useQuery({
     queryKey: ["course", id],
@@ -47,6 +51,26 @@ export default function CourseDetailScreen() {
     },
     enabled: !!id,
   });
+
+  // Realtime subscriptions for course questions and study groups
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`course-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `course_id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["questions", "course", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_groups", filter: `course_id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["study-groups-course", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "solutions" }, () => {
+        // Solutions affect question counts indirectly
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, supabase, queryClient]);
 
   return (
     <View className="flex-1 bg-gray-50">

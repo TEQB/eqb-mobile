@@ -122,6 +122,29 @@ export default function HomeScreen() {
     [allCourses, activeLevel],
   );
 
+  // Realtime subscriptions for home screen
+  useEffect(() => {
+    const channel = supabase
+      .channel("home-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "courses" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["courses-for-programme"] });
+        queryClient.invalidateQueries({ queryKey: ["question-counts"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "programme_courses" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["courses-for-programme"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "past_questions" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["question-counts"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "platform_settings" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["apk-download-url"] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, queryClient]);
+
   return (
     <>
     <ScrollView
