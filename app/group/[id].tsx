@@ -79,7 +79,6 @@ export default function GroupChatScreen() {
   const [reactionPickerOpen, setReactionPickerOpen] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -835,14 +834,7 @@ export default function GroupChatScreen() {
       </Modal>
 
       {/* Image viewer modal */}
-      <Modal visible={!!viewerUrl} animationType="fade" onRequestClose={() => setViewerUrl(null)}>
-        <View className="flex-1 bg-black/95 items-center justify-center">
-          <TouchableOpacity className="absolute top-12 right-4 z-10" onPress={() => setViewerUrl(null)}>
-            <X size={28} color="white" />
-          </TouchableOpacity>
-          {viewerUrl && <Image source={{ uri: viewerUrl }} className="w-full h-full" resizeMode="contain" />}
-        </View>
-      </Modal>
+      <ImageViewer visible={!!viewerUrl} uri={viewerUrl || ""} onClose={() => setViewerUrl(null)} />
     </KeyboardAvoidingView>
   );
 }
