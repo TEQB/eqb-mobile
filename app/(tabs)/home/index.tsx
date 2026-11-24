@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Linking, Modal } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Modal, Share } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uniqueChannelTopic } from "@/lib/utils";
 import QRCode from "react-native-qrcode-svg";
-import { ChevronRight, Download, Smartphone, X } from "lucide-react-native";
+import { ChevronRight, Share2, Smartphone, X } from "lucide-react-native";
 
 interface StudentCourse {
   id: string;
@@ -125,7 +126,7 @@ export default function HomeScreen() {
   // Realtime subscriptions for home screen
   useEffect(() => {
     const channel = supabase
-      .channel("home-realtime")
+      .channel(uniqueChannelTopic("home-realtime"))
       .on("postgres_changes", { event: "*", schema: "public", table: "courses" }, () => {
         queryClient.invalidateQueries({ queryKey: ["courses-for-programme"] });
         queryClient.invalidateQueries({ queryKey: ["question-counts"] });
@@ -144,6 +145,18 @@ export default function HomeScreen() {
       supabase.removeChannel(channel);
     };
   }, [supabase, queryClient]);
+
+  const handleShareApk = async () => {
+    if (!apkUrl) return;
+    try {
+      await Share.share({
+        message: `Get the EQB app for past questions and study groups: ${apkUrl}`,
+        url: apkUrl,
+      });
+    } catch {
+      // user dismissed the share sheet
+    }
+  };
 
   return (
     <>
@@ -198,12 +211,12 @@ export default function HomeScreen() {
             <Smartphone size={20} color="white" />
           </View>
           <View className="flex-1 ml-3">
-            <Text className="text-foreground font-semibold">Get the EQB mobile app</Text>
-            <Text className="text-muted-foreground text-xs mt-0.5">Download the latest APK for Android</Text>
+            <Text className="text-foreground font-semibold">Share the EQB app</Text>
+            <Text className="text-muted-foreground text-xs mt-0.5">Friends scan the QR code or tap the link to install</Text>
           </View>
           <View className="bg-primary rounded-full px-4 py-2 flex-row items-center gap-1.5">
-            <Download size={14} color="white" />
-            <Text className="text-primary-foreground text-xs font-semibold">Download</Text>
+            <Share2 size={14} color="white" />
+            <Text className="text-primary-foreground text-xs font-semibold">Share</Text>
           </View>
         </TouchableOpacity>
       )}
@@ -235,23 +248,23 @@ export default function HomeScreen() {
       <View className="flex-1 bg-black/50 items-center justify-center px-6">
         <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center">
           <View className="w-full flex-row items-center justify-between mb-4">
-            <Text className="text-lg font-bold text-foreground">Download EQB App</Text>
+            <Text className="text-lg font-bold text-foreground">Share EQB App</Text>
             <TouchableOpacity onPress={() => setApkQrOpen(false)} className="p-1">
               <X size={22} color="#6B7280" />
             </TouchableOpacity>
           </View>
           <Text className="text-sm text-muted-foreground text-center mb-4">
-            Scan this code with another phone to download the app, or tap below to download on this device.
+            Have a friend scan this QR code with their phone camera to download the app, or share the link with them.
           </Text>
           <View className="bg-white p-4 rounded-2xl border border-border mb-4">
             <QRCode value={apkUrl ?? ""} size={200} />
           </View>
           <TouchableOpacity
             className="w-full bg-primary py-3.5 rounded-2xl flex-row items-center justify-center gap-2"
-            onPress={() => apkUrl && Linking.openURL(apkUrl)}
+            onPress={handleShareApk}
           >
-            <Download size={18} color="white" />
-            <Text className="text-primary-foreground font-semibold">Download on this device</Text>
+            <Share2 size={18} color="white" />
+            <Text className="text-primary-foreground font-semibold">Share to other devices</Text>
           </TouchableOpacity>
         </View>
       </View>

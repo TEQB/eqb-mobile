@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from "react
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uniqueChannelTopic } from "@/lib/utils";
 import { MessageCircle } from "lucide-react-native";
 import { useLockGuard } from "@/hooks/useLockGuard";
 
@@ -56,7 +57,7 @@ export default function CourseDetailScreen() {
   useEffect(() => {
     if (!id) return;
     const channel = supabase
-      .channel(`course-${id}`)
+      .channel(uniqueChannelTopic(`course-${id}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `course_id=eq.${id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ["questions", "course", id] });
       })

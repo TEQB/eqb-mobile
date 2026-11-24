@@ -120,4 +120,31 @@ export const studyGroupsApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  setTyping: (groupId: string) =>
+    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/typing`, {
+      method: "POST",
+    }),
+
+  clearTyping: (groupId: string) =>
+    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/typing`, {
+      method: "DELETE",
+    }),
+
+  getTypingUsers: (groupId: string) =>
+    authedFetch<{ typing_users: Array<{ profile_id: string; full_name: string | null; matric_number: string | null }> }>(`/study-groups/${groupId}/typing`),
+
+  markAsRead: (groupId: string, messageId: string) =>
+    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/messages/${messageId}/read`, {
+      method: "POST",
+    }),
+
+  toggleReaction: (groupId: string, messageId: string, emoji: string) =>
+    authedFetch<{ success: boolean; action: "added" | "removed" }>(`/study-groups/${groupId}/messages/${messageId}/reactions`, {
+      method: "POST",
+      body: JSON.stringify({ emoji }),
+    }),
+
+  getReactions: (groupId: string, messageId: string) =>
+    authedFetch<{ reactions: Array<{ emoji: string; count: number; reactor_ids: string[] }> }>(`/study-groups/${groupId}/messages/${messageId}/reactions`),
 };

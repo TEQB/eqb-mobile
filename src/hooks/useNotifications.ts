@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uniqueChannelTopic } from "@/lib/utils";
 
 export interface Notification {
   id: string;
@@ -84,7 +85,7 @@ export function useNotifications(): UseNotificationsReturn {
     // Realtime subscription for instant updates
     if (profileId) {
       const channel = supabase
-        .channel(`notifications-${profileId}`)
+        .channel(uniqueChannelTopic(`notifications-${profileId}`))
         .on(
           "postgres_changes",
           {

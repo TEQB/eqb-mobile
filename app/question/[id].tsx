@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getApiBaseUrl } from "@/lib/env";
+import { uniqueChannelTopic } from "@/lib/utils";
 import {
   ChevronLeft, Download, Flag, FileText, Info, RefreshCw, ZoomIn, ZoomOut,
 } from "lucide-react-native";
@@ -119,7 +120,7 @@ export default function QuestionDetailScreen() {
   useEffect(() => {
     if (!id) return;
     const channel = supabase
-      .channel(`question-${id}`)
+      .channel(uniqueChannelTopic(`question-${id}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `id=eq.${id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ["question", id] });
       })

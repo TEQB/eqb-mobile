@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/providers/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uniqueChannelTopic } from "@/lib/utils";
 
 export default function MyWorkScreen() {
   const router = useRouter();
@@ -57,7 +58,7 @@ export default function MyWorkScreen() {
   useEffect(() => {
     if (!profile?.id) return;
     const channel = supabase
-      .channel(`my-work-${profile.id}`)
+      .channel(uniqueChannelTopic(`my-work-${profile.id}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "past_questions", filter: `uploaded_by=eq.${profile.id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ["contributions", profile.id] });
       })

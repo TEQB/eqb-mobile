@@ -20,3 +20,14 @@ export function daysRemaining(lastUploadAt: string | null, obligationDays: numbe
 export function validateUUID(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
+
+let channelSeq = 0;
+
+/**
+ * supabase.channel(topic) returns the EXISTING channel when the topic is
+ * already subscribed, so .on() after subscribe() throws. Append a unique
+ * suffix so every subscription gets its own channel.
+ */
+export function uniqueChannelTopic(base: string): string {
+  return `${base}-${++channelSeq}`;
+}

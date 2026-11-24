@@ -12,6 +12,8 @@ import { getUniversityEmailDomain } from "@/lib/env";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react-native";
+import { Select } from "@/components/ui/Select";
+import { MatricInput } from "@/components/auth/MatricInput";
 
 type RegisterForm = {
   fullName: string;
@@ -27,7 +29,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<RegisterForm>({
+  const { control, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema) as any,
     defaultValues: { fullName: "", email: "", matricNumber: "", facultyId: "", programmeId: "", currentLevel: 0 },
   });
@@ -84,29 +86,23 @@ export default function RegisterScreen() {
   const selectedProgramme = allProgrammes?.find((p) => p.id === watchProgrammeId);
   const availableLevels = selectedProgramme?.available_levels ?? [];
 
-  // Reset level when programme changes
+  const facultyOptions = (faculties ?? []).map((f) => ({ label: f.name, value: f.id }));
+  const programmeOptions = filteredProgrammes.map((p) => ({ label: p.name, value: p.id }));
+  const levelOptions = availableLevels.map((l) => ({ label: `${l} Level`, value: String(l) }));
+
+  // Cascading resets matching web: changing faculty clears programme + level,
+  // changing programme clears level
   useEffect(() => {
-    if (watchProgrammeId) {
-      setValue("currentLevel", 0);
-    }
+    setValue("programmeId", "");
+    setValue("currentLevel", 0);
+  }, [watchFacultyId, setValue]);
+
+  useEffect(() => {
+    setValue("currentLevel", 0);
   }, [watchProgrammeId, setValue]);
 
   const onSubmit = async (data: RegisterForm) => {
     setError("");
-    const isOpen = openRegistrationLevels.includes(data.currentLevel);
-
-    if (!isOpen && !data.matricNumber?.trim()) {
-      Alert.alert("Matric number required", "Please enter your matric number.");
-      return;
-    }
-    if (!isOpen) {
-      const domain = getUniversityEmailDomain();
-      if (domain && !data.email.toLowerCase().endsWith(domain.toLowerCase())) {
-        Alert.alert("University email required", `Please use your ${domain} email address to register.`);
-        return;
-      }
-    }
-
     setLoading(true);
     try {
       await api.post("/api/auth/send-otp", {
@@ -173,7 +169,7 @@ export default function RegisterScreen() {
 
             <View className="gap-4">
               <View>
-                <Text className="text-sm font-semibold text-foreground mb-1.5">Full Name</Text>
+                <Text className="text-sm font-semibold text-foreground mb-1.5">Full name</Text>
                 <Controller
                   control={control}
                   name="fullName"
@@ -192,7 +188,7 @@ export default function RegisterScreen() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-foreground mb-1.5">{isOpenLevel ? "Email" : "University Email"}</Text>
+                <Text className="text-sm font-semibold text-foreground mb-1.5">{isOpenLevel ? "Email" : "University email"}</Text>
                 <Controller
                   control={control}
                   name="email"
@@ -203,7 +199,20 @@ export default function RegisterScreen() {
                       placeholderTextColor="#9CA3AF"
                       keyboardType="email-address"
                       autoCapitalize="none"
-                      onBlur={onBlur}
+                      onBlur={() => {
+                        onBlur();
+                        if (isOpenLevel) {
+                          setError("");
+                          return;
+                        }
+                        const domain = universityDomain;
+                        const val = (getValues("email") || "").trim();
+                        if (domain && val && !val.toLowerCase().endsWith(domain.toLowerCase())) {
+                          setError(`Only ${domain} emails are accepted`);
+                        } else {
+                          setError("");
+                        }
+                      }}
                       onChangeText={onChange}
                       value={value}
                     />
@@ -214,22 +223,26 @@ export default function RegisterScreen() {
 
               <View>
                 <Text className="text-sm font-semibold text-foreground mb-1.5">
-                  Matric Number{isOpenLevel ? " (optional)" : " *"}
+                  {isOpenLevel ? "Reg number" : "Matric number"}{!isOpenLevel ? <Text className="text-destructive"> *</Text> : null}
                 </Text>
                 <Controller
                   control={control}
                   name="matricNumber"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                      className="h-12 rounded-xl border border-input bg-white/90 px-4 text-foreground"
-                      placeholder="125/23/1/0056"
-                      placeholderTextColor="#9CA3AF"
-                      autoCapitalize="characters"
-                      onBlur={onBlur}
-                      onChangeText={onChange}
-                      value={value}
-                    />
-                  )}
+                  render={({ field: { onChange, onBlur, value } }) =>
+                    isOpenLevel ? (
+                      <TextInput
+                        className="h-12 rounded-xl border border-input bg-white/90 px-4 text-foreground uppercase"
+                        placeholder="e.g. 202330898491GA"
+                        placeholderTextColor="#9CA3AF"
+                        autoCapitalize="characters"
+                        onBlur={onBlur}
+                        onChangeText={(t) => onChange(t.toUpperCase())}
+                        value={value ?? ""}
+                      />
+                    ) : (
+                      <MatricInput value={value ?? ""} onChange={onChange} onBlur={onBlur} />
+                    )
+                  }
                 />
                 {errors.matricNumber && <Text className="text-destructive text-xs mt-1">{errors.matricNumber.message}</Text>}
               </View>
@@ -242,79 +255,38 @@ export default function RegisterScreen() {
                 <View className="gap-3">
                   <View>
                     <Text className="text-sm font-semibold text-foreground mb-1.5">Faculty</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {faculties && faculties.length > 0 ? (
-                        <View className="flex-row gap-2">
-                          {faculties.map((f) => (
-                            <TouchableOpacity
-                              key={f.id}
-                              className={`px-4 py-2.5 rounded-full ${watchFacultyId === f.id ? "bg-primary" : "bg-muted"}`}
-                              onPress={() => { setValue("facultyId", f.id); setValue("programmeId", ""); }}
-                            >
-                              <Text className={watchFacultyId === f.id ? "text-primary-foreground font-medium text-sm" : "text-foreground text-sm"}>
-                                {f.name}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      ) : (
-                        <ActivityIndicator size="small" />
-                      )}
-                    </ScrollView>
+                    <Select
+                      value={watchFacultyId || undefined}
+                      onValueChange={(v) => setValue("facultyId", v)}
+                      options={facultyOptions}
+                      placeholder="Select faculty"
+                    />
                     {errors.facultyId && <Text className="text-destructive text-xs mt-1">{errors.facultyId.message}</Text>}
                   </View>
 
-                  {watchFacultyId ? (
-                    <View>
-                      <Text className="text-sm font-semibold text-foreground mb-1.5">Programme</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {filteredProgrammes.length > 0 ? (
-                          <View className="flex-row gap-2">
-                            {filteredProgrammes.map((p) => (
-                              <TouchableOpacity
-                                key={p.id}
-                                className={`px-4 py-2.5 rounded-full ${watchProgrammeId === p.id ? "bg-primary" : "bg-muted"}`}
-                                onPress={() => setValue("programmeId", p.id)}
-                              >
-                                <Text className={watchProgrammeId === p.id ? "text-primary-foreground font-medium text-sm" : "text-foreground text-sm"}>
-                                  {p.name}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        ) : (
-                          <Text className="text-sm text-muted-foreground">No programmes found</Text>
-                        )}
-                      </ScrollView>
-                      {errors.programmeId && <Text className="text-destructive text-xs mt-1">{errors.programmeId.message}</Text>}
-                    </View>
-                  ) : null}
+                  <View>
+                    <Text className="text-sm font-semibold text-foreground mb-1.5">Programme</Text>
+                    <Select
+                      value={watchProgrammeId || undefined}
+                      onValueChange={(v) => setValue("programmeId", v)}
+                      options={programmeOptions}
+                      placeholder="Select programme"
+                      disabled={!watchFacultyId}
+                    />
+                    {errors.programmeId && <Text className="text-destructive text-xs mt-1">{errors.programmeId.message}</Text>}
+                  </View>
 
-                  {watchProgrammeId ? (
-                    <View>
-                      <Text className="text-sm font-semibold text-foreground mb-1.5">Current Level</Text>
-                      {availableLevels.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                          <View className="flex-row gap-2">
-                            {availableLevels.map((level) => (
-                              <TouchableOpacity
-                                key={level}
-                                className={`px-5 py-2.5 rounded-full ${watchCurrentLevel === level ? "bg-primary" : "bg-muted"}`}
-                                onPress={() => setValue("currentLevel", level)}
-                              >
-                                <Text className={watchCurrentLevel === level ? "text-primary-foreground font-medium text-sm" : "text-foreground text-sm"}>
-                                  {level} Level
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </ScrollView>
-                      ) : (
-                        <Text className="text-sm text-muted-foreground">No levels available for this programme</Text>
-                      )}
-                      {errors.currentLevel && <Text className="text-destructive text-xs mt-1">{errors.currentLevel.message}</Text>}
-                    </View>
-                  ) : null}
+                  <View>
+                    <Text className="text-sm font-semibold text-foreground mb-1.5">Current level</Text>
+                    <Select
+                      value={watchCurrentLevel ? String(watchCurrentLevel) : undefined}
+                      onValueChange={(v) => setValue("currentLevel", Number(v))}
+                      options={levelOptions}
+                      placeholder="Select level"
+                      disabled={!watchProgrammeId}
+                    />
+                    {errors.currentLevel && <Text className="text-destructive text-xs mt-1">{errors.currentLevel.message}</Text>}
+                  </View>
                 </View>
               </View>
 
@@ -326,7 +298,10 @@ export default function RegisterScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <View className="flex-row items-center">
+                    <ActivityIndicator color="white" size="small" />
+                    <Text className="text-primary-foreground font-semibold text-base ml-2">Sending code...</Text>
+                  </View>
                 ) : (
                   <Text className="text-primary-foreground font-semibold text-base">Continue →</Text>
                 )}

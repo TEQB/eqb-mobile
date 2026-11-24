@@ -1,62 +1,71 @@
+import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import Constants from "expo-constants";
+import { getApiBaseUrl } from "./env";
 
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  try {
-    const { isDevice } = await import("expo-device");
-    if (!isDevice) {
-      return null;
-    }
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
-    const Notifications = await import("expo-notifications").then((m) => m);
+export async function registerForPushNotifications() {
+  let token: string | null = null;
 
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#7A1030",
     });
+  }
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "Default",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#7A1030",
-      });
-    }
-
+  if (Platform.OS === "ios") {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-
     if (finalStatus !== "granted") {
+      alert("Failed to get push token for push notification!");
       return null;
     }
+  }
 
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) {
-      return null;
-    }
+  token = (await Notifications.getExpoPushTokenAsync()).data;
+  return token;
+}
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    return tokenData.data;
-  } catch {
-    // Push setup can throw in Expo Go on Android (notifications aren't fully
-    // supported there since SDK 53) or in dev builds missing native config.
-    // Degrade gracefully — push just won't work; the app continues without it.
-    return null;
+export async function registerDeviceToken(token: string) {
+  try {
+    const platform = Platform.OS === "ios" ? "ios" : "android";
+    const response = await fetch(`${getApiBaseUrl()}/api/push/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform, token }),
+    });
+    return response.ok;
+  } catch (e) {
+    console.error("Failed to register device token:", e);
+    return false;
   }
 }
 
-export function getPushPlatform(): "ios" | "android" {
-  if (Platform.OS === "ios") return "ios";
-  return "android";
+export async function unregisterDeviceToken(token: string) {
+  try {
+    const platform = Platform.OS === "ios" ? "ios" : "android";
+    const response = await fetch(`${getApiBaseUrl()}/api/push/token`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform, token }),
+    });
+    return response.ok;
+  } catch (e) {
+    console.error("Failed to unregister device token:", e);
+    return false;
+  }
 }

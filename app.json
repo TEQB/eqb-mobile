@@ -3,6 +3,9 @@
     "name": "EQB",
     "slug": "eqb-mobile",
     "version": "1.0.0",
+    "cli": {
+      "appVersionSource": "local"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "eqb",
@@ -27,8 +30,6 @@
       "package": "com.eqb.mobile",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]
     },
@@ -40,6 +41,14 @@
       "expo-font",
       "expo-web-browser",
       "expo-camera",
+      [
+        "expo-notifications",
+        {
+          "color": "#7A1030"
+        }
+      ],
+      "expo-splash-screen",
+      "expo-status-bar",
       "./plugins/withArm64Only"
     ],
     "extra": {

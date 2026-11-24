@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshControl } from "react-native";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { sharedCoursesApi, type PendingSharedRequest, type StudentCourse as SharedCourse } from "@/lib/sharedCourses";
+import { uniqueChannelTopic } from "@/lib/utils";
 import { Search, ChevronRight, ThumbsUp, ThumbsDown, Link2, Unlink } from "lucide-react-native";
 
 interface StudentCourse {
@@ -213,7 +214,7 @@ export default function BrowseScreen() {
   // Realtime subscriptions for shared course changes
   useEffect(() => {
     const channel = supabase
-      .channel("browse-realtime")
+      .channel(uniqueChannelTopic("browse-realtime"))
       .on("postgres_changes", { event: "*", schema: "public", table: "courses" }, () => {
         queryClient.invalidateQueries({ queryKey: ["all-courses"] });
         queryClient.invalidateQueries({ queryKey: ["joinable-courses"] });

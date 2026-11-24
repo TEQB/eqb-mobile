@@ -7,12 +7,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { studyGroupsApi, type GroupMember } from "@/lib/studyGroups";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uniqueChannelTopic } from "@/lib/utils";
 import { useLockGuard } from "@/hooks/useLockGuard";
 import QRCode from "react-native-qrcode-svg";
 import * as ImagePicker from "expo-image-picker";
+import * as Notifications from "expo-notifications";
 import {
-  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon,
+  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search,
 } from "lucide-react-native";
+import { ImageViewer } from "@/components/ImageViewer";
 
 interface Message {
   id: string;
@@ -50,7 +53,7 @@ function ChatImage({ path, onPress }: { path: string; onPress?: () => void }) {
     );
   }
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+    <TouchableOpacity onPress={() => onPress?.(url)} activeOpacity={0.9}>
       <Image source={{ uri: url }} className="w-56 h-56 rounded-xl" resizeMode="cover" />
     </TouchableOpacity>
   );
@@ -72,7 +75,13 @@ export default function GroupChatScreen() {
   const [qrOpen, setQrOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Array<{ profile_id: string; full_name: string | null; matric_number: string | null }>>([]);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: detail, isLoading, refetch } = useQuery({
     queryKey: ["study-group", id],
@@ -111,6 +120,49 @@ export default function GroupChatScreen() {
     return msg.content ?? "";
   }, []);
 
+  // Filter messages by search query
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+    const q = searchQuery.toLowerCase();
+    return messages.filter((m) =>
+      m.content?.toLowerCase().includes(q) ||
+      senderLabel(m.sender_id).toLowerCase().includes(q)
+    );
+  }, [messages, searchQuery, senderLabel]);
+
+  // Extract @mentions from message content
+  const extractMentions = useCallback((content: string | null) => {
+    if (!content) return [];
+    const mentionRegex = /@([a-zA-Z0-9_-]+)/g;
+    const matches = content.match(mentionRegex) || [];
+    return matches.map((m) => m.slice(1));
+  }, []);
+
+  // Check if a message mentions current user
+  const isMentioned = useCallback((content: string | null) => {
+    if (!content || !myProfileId) return false;
+    const mentions = extractMentions(content);
+    return mentions.some((mention) => {
+      const member = members.find((m) =>
+        m.matric_number?.toLowerCase() === mention.toLowerCase() ||
+        m.full_name?.toLowerCase().includes(mention.toLowerCase())
+      );
+      return member?.profile_id === myProfileId;
+    });
+  }, [members, myProfileId, extractMentions]);
+
+  // Get delivery status for message
+  const getDeliveryStatus = useCallback((msg: any) => {
+    if (msg.sender_id !== myProfileId) return null;
+    const readBy = (msg.read_by || []) as Array<{ profile_id: string; read_at: string }>;
+    const totalMembers = members.length;
+    const readCount = readBy.length;
+    
+    if (readCount >= totalMembers - 1) return "read";
+    if (readCount > 0) return "delivered";
+    return "sent";
+  }, [myProfileId, members]);
+
   // Fetch initial messages
   useEffect(() => {
     if (!id) return;
@@ -128,7 +180,7 @@ export default function GroupChatScreen() {
   useEffect(() => {
     if (!id) return;
     const channel = supabase
-      .channel(`group-${id}`)
+      .channel(uniqueChannelTopic(`group-${id}`))
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "study_group_messages", filter: `group_id=eq.${id}` },
@@ -145,6 +197,22 @@ export default function GroupChatScreen() {
           queryClient.invalidateQueries({ queryKey: ["study-group", id] });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_typing", filter: `group_id=eq.${id}` },
+        () => {
+          // Refresh typing indicators
+          studyGroupsApi.getTypingUsers(id!).then((data) => setTypingUsers(data.typing_users || [])).catch(() => {});
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_message_reactions", filter: `group_id=eq.${id}` },
+        () => {
+          // Reload messages to get updated reactions
+          studyGroupsApi.messages(id!).then((data) => setMessages(data.messages as Message[])).catch(() => {});
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -155,6 +223,35 @@ export default function GroupChatScreen() {
     listRef.current?.scrollToEnd({ animated: true });
   }, [messages.length, tab]);
 
+  // Typing indicator
+  const handleTyping = () => {
+    if (!myProfileId) return;
+    studyGroupsApi.setTyping(id!).catch(() => {});
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      studyGroupsApi.clearTyping(id!).catch(() => {});
+    }, 3000);
+  };
+
+  // Mark message as read
+  const markAsRead = async (messageId: string) => {
+    if (!myProfileId) return;
+    studyGroupsApi.markAsRead(id!, messageId).catch(() => {});
+  };
+
+  // Add/remove reaction
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!myProfileId) return;
+    try {
+      await studyGroupsApi.toggleReaction(id!, messageId, emoji);
+      // Reload messages to get updated reactions
+      const data = await studyGroupsApi.messages(id!);
+      setMessages(data.messages as Message[]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const sendMessage = async () => {
     const content = input.trim();
     if (!content || !myProfileId || sending) return;
@@ -162,6 +259,9 @@ export default function GroupChatScreen() {
     setInput("");
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
+    // Clear typing indicator
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    studyGroupsApi.clearTyping(id!).catch(() => {});
     try {
       const res = await studyGroupsApi.sendMessage(id!, { content, type: "text", reply_to_id: replyId });
       if (res.message) upsertMessage(res.message as Message);
@@ -215,6 +315,21 @@ export default function GroupChatScreen() {
     const { data } = await supabase.storage.from("chat-media").createSignedUrl(path, 3600);
     if (data?.signedUrl) setViewerUrl(data.signedUrl);
   };
+
+  // Register for push notifications on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await Notifications.getExpoPushTokenAsync();
+        if (token) {
+          // Register token with backend
+          // This would be called after login
+        }
+      } catch (e) {
+        console.error("Failed to get push token:", e);
+      }
+    })();
+  }, []);
 
   const handleLeave = () => {
     Alert.alert("Leave group?", "You will stop receiving messages from this group.", [
@@ -276,21 +391,36 @@ export default function GroupChatScreen() {
         </View>
       );
     }
+    // Check if this is a nested reply (reply to a reply)
+    const nestedReply = replied.reply_to_id ? messageMap.get(replied.reply_to_id) : null;
     const mine = replied.sender_id === myProfileId;
     return (
-      <View className={`rounded-lg px-2 py-1 mb-1 ${mine ? "bg-white/20" : "bg-black/10"}`}>
+      <View className={`rounded-lg px-2 py-1 mb-1 ${mine ? "bg-white/20" : "bg-black/10"} ${nestedReply ? "border-l-2 border-gray-300" : ""}`}>
         <Text className={`text-[11px] font-semibold ${mine ? "text-white" : "text-primary"}`}>
           {senderLabel(replied.sender_id)}
         </Text>
         <Text className={`text-[11px] ${mine ? "text-white/80" : "text-gray-600"}`} numberOfLines={1}>
           {messagePreview(replied)}
         </Text>
+        {nestedReply && (
+          <Text className={`text-[10px] ${mine ? "text-white/50" : "text-gray-400"}`}>
+            Reply to {senderLabel(nestedReply.sender_id)}
+          </Text>
+        )}
       </View>
     );
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
     const mine = item.sender_id === myProfileId;
+    const readBy = (item as any).read_by || [];
+    const reactions = (item as any).reactions || [];
+    const reactionCounts = reactions.reduce((acc: Record<string, number>, r: any) => {
+      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+      return acc;
+    }, {});
+    const mentioned = isMentioned(item.content);
+    const deliveryStatus = getDeliveryStatus(item);
     return (
       <TouchableOpacity
         className={`mb-2 ${mine ? "items-end" : "items-start"}`}
@@ -301,24 +431,78 @@ export default function GroupChatScreen() {
         {!mine && (
           <Text className="text-xs text-muted-foreground mb-0.5 ml-1">{senderLabel(item.sender_id)}</Text>
         )}
-        <View
-          className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-            mine ? "bg-primary rounded-br-sm" : "bg-white rounded-bl-sm"
-          }`}
-        >
-          {item.reply_to_id && renderReplyQuote(item)}
-          {item.type === "image" && item.media_url ? (
-            <ChatImage path={item.media_url} onPress={() => openImageViewer(item.media_url!)} />
-          ) : (
-            <Text className={mine ? "text-primary-foreground" : "text-foreground"}>{item.content}</Text>
+        {mentioned && (
+          <Text className="text-xs text-primary font-semibold mb-0.5 ml-1">@mentioned</Text>
+        )}
+        <View className="relative">
+          <View
+            className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+              mine ? "bg-primary rounded-br-sm" : "bg-white rounded-bl-sm"
+            }`}
+          >
+            {item.reply_to_id && renderReplyQuote(item)}
+            {item.type === "image" && item.media_url ? (
+              <ChatImage path={item.media_url} onPress={(url) => setViewerUrl(url)} />
+            ) : (
+              <Text className={mine ? "text-primary-foreground" : "text-foreground"}>
+                {item.content?.split(/(@\w+)/g).map((part, i) =>
+                  part.startsWith("@") ? (
+                    <Text key={i} className={`font-semibold ${mine ? "text-white" : "text-primary"}`}>
+                      {part}
+                    </Text>
+                  ) : (
+                    part
+                  )
+                )}
+              </Text>
+            )}
+            {item.type === "image" && item.content ? (
+              <Text className={`text-xs mt-1 ${mine ? "text-white/80" : "text-gray-500"}`}>{item.content}</Text>
+            ) : null}
+          </View>
+          <View className="flex-row items-center gap-1 mt-1">
+            <TouchableOpacity onPress={() => setReplyTo(item)} className="bg-white border border-border rounded-full p-1">
+              <Reply size={12} color="#6B7280" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setReactionPickerOpen(reactionPickerOpen === item.id ? null : item.id)} className="bg-white border border-border rounded-full p-1">
+              <Smile size={12} color="#6B7280" />
+            </TouchableOpacity>
+            {Object.keys(reactionCounts).length > 0 && (
+              <View className="flex-row gap-1">
+                {Object.entries(reactionCounts).map(([emoji, count]) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    onPress={() => toggleReaction(item.id, emoji)}
+                    className="bg-muted rounded-full px-2 py-0.5"
+                  >
+                    <Text className="text-xs">{emoji} {count}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          {reactionPickerOpen === item.id && (
+            <View className="absolute top-full mt-2 bg-white border border-border rounded-lg shadow-lg p-2 flex-row gap-2 z-10">
+              {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => {
+                    toggleReaction(item.id, emoji);
+                    setReactionPickerOpen(null);
+                  }}
+                  className="text-2xl p-1"
+                >
+                  <Text>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
-          {item.type === "image" && item.content ? (
-            <Text className={`text-xs mt-1 ${mine ? "text-white/80" : "text-gray-500"}`}>{item.content}</Text>
-          ) : null}
         </View>
         <Text className="text-[10px] text-muted-foreground mt-0.5">
           {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          {mine ? " · You" : ""}
+          {mine && deliveryStatus === "sent" && " · Sent"}
+          {mine && deliveryStatus === "delivered" && " · Delivered"}
+          {mine && deliveryStatus === "read" && " · Read"}
         </Text>
       </TouchableOpacity>
     );
@@ -347,6 +531,9 @@ export default function GroupChatScreen() {
           <TouchableOpacity onPress={() => setQrOpen(true)} className="p-2">
             <QrCode size={22} color="#7A1030" />
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSearchOpen(!searchOpen)} className="p-2">
+            <Search size={22} color="#7A1030" />
+          </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -372,10 +559,36 @@ export default function GroupChatScreen() {
           <FlatList
             ref={listRef}
             className="flex-1 px-4 pt-3"
-            data={messages}
+            data={filteredMessages}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={{ paddingBottom: 12 }}
+            ListHeaderComponent={
+              <>
+                {searchOpen && (
+                  <View className="mb-3">
+                    <TextInput
+                      placeholder="Search messages..."
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      className="bg-muted border border-border rounded-lg px-3 py-2 text-sm"
+                    />
+                  </View>
+                )}
+                {typingUsers.length > 0 ? (
+                  <View className="mb-2">
+                    <Text className="text-xs text-muted-foreground">
+                      {typingUsers.map((u, i) => (
+                        <Text key={u.profile_id}>
+                          {i > 0 && ", "}
+                          {u.full_name || u.matric_number || "Someone"} is typing...
+                        </Text>
+                      ))}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            }
             ListEmptyComponent={
               loadingMessages ? (
                 <ActivityIndicator className="mt-10" />
@@ -414,7 +627,10 @@ export default function GroupChatScreen() {
               placeholder="Type a message..."
               placeholderTextColor="#9CA3AF"
               value={input}
-              onChangeText={setInput}
+              onChangeText={(text) => {
+                setInput(text);
+                handleTyping();
+              }}
               multiline
               maxLength={2000}
             />
@@ -428,6 +644,102 @@ export default function GroupChatScreen() {
           </View>
         </>
       ) : (
+        <ScrollView className="flex-1 px-4 pt-3 pb-6">
+          {/* Privacy settings */}
+          <View className="bg-white/90 rounded-2xl p-4 mb-4 shadow-sm">
+            <View className="flex-row items-center mb-3">
+              <Shield size={18} color="#7A1030" />
+              <Text className="text-foreground font-semibold ml-2">Your privacy in this group</Text>
+            </View>
+            <Text className="text-xs text-muted-foreground mb-3">
+              You are always identified by your matric number. Choose what else to share:
+            </Text>
+            {([
+              ["share_name", "Share my name"],
+            ] as const).map(([key, label]) => (
+              <View key={key} className="flex-row items-center justify-between py-2">
+                <Text className="text-foreground text-sm">{label}</Text>
+                <Switch
+                  value={myMembership?.[key] ?? false}
+                  onValueChange={(v) => updatePrivacy(key, v)}
+                  trackColor={{ true: "#7A1030", false: "#E5D7D0" }}
+                />
+              </View>
+            ))}
+          </View>
+
+          {/* Members list */}
+          {members.map((m) => (
+            <View key={m.membership_id} className="bg-white/90 rounded-2xl p-4 mb-3 flex-row items-center">
+              <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
+                <Text className="text-primary font-bold">{(m.matric_number ?? "S").charAt(0)}</Text>
+              </View>
+              <View className="flex-1 ml-3">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-foreground font-semibold">{m.matric_number ?? "Student"}</Text>
+                  {m.role === "admin" && (
+                    <View className="bg-primary/10 rounded-full px-2 py-0.5">
+                      <Text className="text-primary text-[10px] font-semibold">Admin</Text>
+                    </View>
+                  )}
+                  {m.is_me && (
+                    <View className="bg-secondary/10 rounded-full px-2 py-0.5">
+                      <Text className="text-secondary text-[10px] font-semibold">You</Text>
+                    </View>
+                  )}
+                </View>
+                {m.full_name && <Text className="text-muted-foreground text-sm">{m.full_name}</Text>}
+                <Text className="text-muted-foreground text-xs mt-0.5">
+                  {m.programme_name ?? ""}{m.current_level ? ` · Level ${m.current_level}` : ""}
+                </Text>
+              </View>
+              {isAdmin && !m.is_me && (
+                <TouchableOpacity onPress={() => handleRemoveMember(m.profile_id, m.matric_number ?? "this member")} className="p-2">
+                  <UserX size={18} color="#DC2626" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            className="bg-white/90 rounded-2xl p-4 mt-2 flex-row items-center justify-center gap-2"
+            onPress={handleLeave}
+          >
+            <LogOut size={18} color="#DC2626" />
+            <Text className="text-destructive font-semibold">Leave group</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* QR Invite modal */}
+      <Modal visible={qrOpen} animationType="fade" onRequestClose={() => setQrOpen(false)}>
+        <View className="flex-1 bg-background/95 items-center justify-center p-6">
+          <View className="bg-white rounded-3xl p-6 items-center w-full max-w-sm">
+            <View className="flex-row items-center justify-between w-full mb-4">
+              <Text className="text-lg font-bold text-foreground">Invite to group</Text>
+              <TouchableOpacity onPress={() => setQrOpen(false)}>
+                <X size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-sm text-muted-foreground text-center mb-4">
+              {group?.name} — ask classmates to scan this code or enter the invite code.
+            </Text>
+            <View className="bg-white p-4 rounded-2xl border border-border">
+              <QRCode value={group?.invite_code ?? ""} size={200} />
+            </View>
+            <View className="mt-4 bg-muted rounded-xl px-4 py-3 w-full items-center">
+              <Text className="text-xs text-muted-foreground">Invite code</Text>
+              <Text className="text-foreground font-bold mt-1">{group?.invite_code}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image viewer modal */}
+      <ImageViewer visible={!!viewerUrl} uri={viewerUrl || ""} onClose={() => setViewerUrl(null)} />
+    </KeyboardAvoidingView>
+  );
+}
         <ScrollView className="flex-1 px-4 pt-3 pb-6">
           {/* Privacy settings */}
           <View className="bg-white/90 rounded-2xl p-4 mb-4 shadow-sm">

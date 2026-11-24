@@ -5,6 +5,7 @@ import { Megaphone, X } from "lucide-react-native";
 import { useAuth } from "@/providers/AuthProvider";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { announcementsApi, type Announcement } from "@/lib/announcements";
+import { uniqueChannelTopic } from "@/lib/utils";
 
 export function Announcements() {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ export function Announcements() {
     if (!user) return;
     const supabase = getSupabaseClient();
     const channel = supabase
-      .channel("announcements")
+      .channel(uniqueChannelTopic("announcements"))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "announcements" },

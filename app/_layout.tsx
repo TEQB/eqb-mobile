@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AppProviders } from "@/providers/AppProviders";
 import { Announcements } from "@/components/Announcements";
+import { PushNotificationHandler } from "@/components/PushNotificationHandler";
 
 export default function RootLayout() {
   return (
@@ -20,6 +21,7 @@ export default function RootLayout() {
         <Stack.Screen name="notifications" options={{ animation: "slide_from_right" }} />
       </Stack>
       <Announcements />
+      <PushNotificationHandler />
     </AppProviders>
   );
 }
