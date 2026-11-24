@@ -7,11 +7,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { studyGroupsApi, type GroupMember } from "@/lib/studyGroups";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { uniqueChannelTopic } from "@/lib/utils";
 import { useLockGuard } from "@/hooks/useLockGuard";
 import QRCode from "react-native-qrcode-svg";
 import * as ImagePicker from "expo-image-picker";
-import * as Notifications from "expo-notifications";
 import {
   ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search,
 } from "lucide-react-native";
@@ -53,7 +51,7 @@ function ChatImage({ path, onPress }: { path: string; onPress?: () => void }) {
     );
   }
   return (
-    <TouchableOpacity onPress={() => onPress?.(url)} activeOpacity={0.9}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
       <Image source={{ uri: url }} className="w-56 h-56 rounded-xl" resizeMode="cover" />
     </TouchableOpacity>
   );
@@ -179,7 +177,7 @@ export default function GroupChatScreen() {
   useEffect(() => {
     if (!id) return;
     const channel = supabase
-      .channel(uniqueChannelTopic(`group-${id}`))
+      .channel(`group-${id}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "study_group_messages", filter: `group_id=eq.${id}` },
@@ -643,102 +641,6 @@ export default function GroupChatScreen() {
           </View>
         </>
       ) : (
-        <ScrollView className="flex-1 px-4 pt-3 pb-6">
-          {/* Privacy settings */}
-          <View className="bg-white/90 rounded-2xl p-4 mb-4 shadow-sm">
-            <View className="flex-row items-center mb-3">
-              <Shield size={18} color="#7A1030" />
-              <Text className="text-foreground font-semibold ml-2">Your privacy in this group</Text>
-            </View>
-            <Text className="text-xs text-muted-foreground mb-3">
-              You are always identified by your matric number. Choose what else to share:
-            </Text>
-            {([
-              ["share_name", "Share my name"],
-            ] as const).map(([key, label]) => (
-              <View key={key} className="flex-row items-center justify-between py-2">
-                <Text className="text-foreground text-sm">{label}</Text>
-                <Switch
-                  value={myMembership?.[key] ?? false}
-                  onValueChange={(v) => updatePrivacy(key, v)}
-                  trackColor={{ true: "#7A1030", false: "#E5D7D0" }}
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Members list */}
-          {members.map((m) => (
-            <View key={m.membership_id} className="bg-white/90 rounded-2xl p-4 mb-3 flex-row items-center">
-              <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
-                <Text className="text-primary font-bold">{(m.matric_number ?? "S").charAt(0)}</Text>
-              </View>
-              <View className="flex-1 ml-3">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-foreground font-semibold">{m.matric_number ?? "Student"}</Text>
-                  {m.role === "admin" && (
-                    <View className="bg-primary/10 rounded-full px-2 py-0.5">
-                      <Text className="text-primary text-[10px] font-semibold">Admin</Text>
-                    </View>
-                  )}
-                  {m.is_me && (
-                    <View className="bg-secondary/10 rounded-full px-2 py-0.5">
-                      <Text className="text-secondary text-[10px] font-semibold">You</Text>
-                    </View>
-                  )}
-                </View>
-                {m.full_name && <Text className="text-muted-foreground text-sm">{m.full_name}</Text>}
-                <Text className="text-muted-foreground text-xs mt-0.5">
-                  {m.programme_name ?? ""}{m.current_level ? ` · Level ${m.current_level}` : ""}
-                </Text>
-              </View>
-              {isAdmin && !m.is_me && (
-                <TouchableOpacity onPress={() => handleRemoveMember(m.profile_id, m.matric_number ?? "this member")} className="p-2">
-                  <UserX size={18} color="#DC2626" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-
-          <TouchableOpacity
-            className="bg-white/90 rounded-2xl p-4 mt-2 flex-row items-center justify-center gap-2"
-            onPress={handleLeave}
-          >
-            <LogOut size={18} color="#DC2626" />
-            <Text className="text-destructive font-semibold">Leave group</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-
-      {/* QR Invite modal */}
-      <Modal visible={qrOpen} animationType="fade" onRequestClose={() => setQrOpen(false)}>
-        <View className="flex-1 bg-background/95 items-center justify-center p-6">
-          <View className="bg-white rounded-3xl p-6 items-center w-full max-w-sm">
-            <View className="flex-row items-center justify-between w-full mb-4">
-              <Text className="text-lg font-bold text-foreground">Invite to group</Text>
-              <TouchableOpacity onPress={() => setQrOpen(false)}>
-                <X size={22} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <Text className="text-sm text-muted-foreground text-center mb-4">
-              {group?.name} — ask classmates to scan this code or enter the invite code.
-            </Text>
-            <View className="bg-white p-4 rounded-2xl border border-border">
-              <QRCode value={group?.invite_code ?? ""} size={200} />
-            </View>
-            <View className="mt-4 bg-muted rounded-xl px-4 py-3 w-full items-center">
-              <Text className="text-xs text-muted-foreground">Invite code</Text>
-              <Text className="text-foreground font-bold mt-1">{group?.invite_code}</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Image viewer modal */}
-      <ImageViewer visible={!!viewerUrl} uri={viewerUrl || ""} onClose={() => setViewerUrl(null)} />
-    </KeyboardAvoidingView>
-  );
-}
         <ScrollView className="flex-1 px-4 pt-3 pb-6">
           {/* Privacy settings */}
           <View className="bg-white/90 rounded-2xl p-4 mb-4 shadow-sm">
