@@ -11,7 +11,7 @@ import { useLockGuard } from "@/hooks/useLockGuard";
 import QRCode from "react-native-qrcode-svg";
 import * as ImagePicker from "expo-image-picker";
 import {
-  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search,
+  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search, Trash2,
 } from "lucide-react-native";
 import { ImageViewer } from "@/components/ImageViewer";
 
@@ -23,6 +23,7 @@ interface Message {
   type: string;
   media_url: string | null;
   reply_to_id: string | null;
+  deleted_at?: string | null;
   created_at: string;
 }
 
@@ -188,6 +189,14 @@ export default function GroupChatScreen() {
       )
       .on(
         "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "study_group_messages", filter: `group_id=eq.${id}` },
+        (payload) => {
+          const msg = payload.new as Message;
+          setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)));
+        },
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "study_group_members", filter: `group_id=eq.${id}` },
         () => {
           // Refresh group detail (members list) when someone joins/leaves
@@ -234,6 +243,24 @@ export default function GroupChatScreen() {
   const markAsRead = async (messageId: string) => {
     if (!myProfileId) return;
     studyGroupsApi.markAsRead(id!, messageId).catch(() => {});
+  };
+
+  const handleDeleteMessage = (msg: Message) => {
+    Alert.alert("Delete message?", "This message will be replaced with \"This message was deleted\" for everyone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await studyGroupsApi.deleteMessage(id!, msg.id);
+            setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deleted_at: new Date().toISOString(), content: null, media_url: null } : m)));
+          } catch (err: any) {
+            Alert.alert("Error", err.message || "Could not delete message");
+          }
+        },
+      },
+    ]);
   };
 
   // Add/remove reaction
@@ -437,8 +464,13 @@ export default function GroupChatScreen() {
               mine ? "bg-primary rounded-br-sm" : "bg-white rounded-bl-sm"
             }`}
           >
-            {item.reply_to_id && renderReplyQuote(item)}
-            {item.type === "image" && item.media_url ? (
+            {item.deleted_at ? (
+              <Text className={`italic ${mine ? "text-white/70" : "text-gray-400"}`}>
+                This message was deleted
+              </Text>
+            ) : item.reply_to_id ? renderReplyQuote(item) : null}
+            {!item.deleted_at && item.reply_to_id && item.type !== "image" ? null : null}
+            {!item.deleted_at && (item.type === "image" && item.media_url ? (
               <ChatImage path={item.media_url} onPress={(url) => setViewerUrl(url)} />
             ) : (
               <Text className={mine ? "text-primary-foreground" : "text-foreground"}>
@@ -452,15 +484,21 @@ export default function GroupChatScreen() {
                   )
                 )}
               </Text>
-            )}
-            {item.type === "image" && item.content ? (
+            ))}
+            {!item.deleted_at && item.type === "image" && item.content ? (
               <Text className={`text-xs mt-1 ${mine ? "text-white/80" : "text-gray-500"}`}>{item.content}</Text>
             ) : null}
           </View>
+          {!item.deleted_at && (
           <View className="flex-row items-center gap-1 mt-1">
             <TouchableOpacity onPress={() => setReplyTo(item)} className="bg-white border border-border rounded-full p-1">
               <Reply size={12} color="#6B7280" />
             </TouchableOpacity>
+            {mine && (
+              <TouchableOpacity onPress={() => handleDeleteMessage(item)} className="bg-white border border-border rounded-full p-1">
+                <Trash2 size={12} color="#DC2626" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => setReactionPickerOpen(reactionPickerOpen === item.id ? null : item.id)} className="bg-white border border-border rounded-full p-1">
               <Smile size={12} color="#6B7280" />
             </TouchableOpacity>
@@ -478,6 +516,7 @@ export default function GroupChatScreen() {
               </View>
             )}
           </View>
+          )}
           {reactionPickerOpen === item.id && (
             <View className="absolute top-full mt-2 bg-white border border-border rounded-lg shadow-lg p-2 flex-row gap-2 z-10">
               {["👍", "❤️", "😂", "😮", "😢", "🔥"].map((emoji) => (

@@ -147,4 +147,9 @@ export const studyGroupsApi = {
 
   getReactions: (groupId: string, messageId: string) =>
     authedFetch<{ reactions: Array<{ emoji: string; count: number; reactor_ids: string[] }> }>(`/study-groups/${groupId}/messages/${messageId}/reactions`),
+
+  deleteMessage: (groupId: string, messageId: string) =>
+    authedFetch<{ success: boolean }>(`/study-groups/${groupId}/messages/${messageId}`, {
+      method: "DELETE",
+    }),
 };
