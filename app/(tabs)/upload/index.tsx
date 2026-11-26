@@ -132,6 +132,15 @@ export default function UploadTabScreen() {
 
   const selectedCourse = courses?.find((c) => c.id === courseId);
 
+  // Auto-derive semester from course code (last digit: odd=first, even=second)
+  useEffect(() => {
+    if (!selectedCourse?.code) return;
+    const digits = selectedCourse.code.replace(/\D/g, "");
+    if (digits.length < 3) return;
+    const lastDigit = Number(digits[digits.length - 1]);
+    setSemester(lastDigit % 2 === 0 ? "second" : "first");
+  }, [selectedCourse?.code]);
+
   const pickFromCamera = async () => {
     if (selectedFiles.length >= MAX_PAGES) {
       Alert.alert("Limit reached", `Maximum ${MAX_PAGES} pages allowed`);
