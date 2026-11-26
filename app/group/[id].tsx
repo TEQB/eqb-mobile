@@ -11,7 +11,7 @@ import { useLockGuard } from "@/hooks/useLockGuard";
 import QRCode from "react-native-qrcode-svg";
 import * as ImagePicker from "expo-image-picker";
 import {
-  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search, Trash2,
+  ChevronLeft, Send, QrCode, LogOut, Shield, X, UserX, Image as ImageIcon, Smile, Search, Trash2, Reply,
 } from "lucide-react-native";
 import { ImageViewer } from "@/components/ImageViewer";
 
@@ -339,21 +339,6 @@ export default function GroupChatScreen() {
     const { data } = await supabase.storage.from("chat-media").createSignedUrl(path, 3600);
     if (data?.signedUrl) setViewerUrl(data.signedUrl);
   };
-
-  // Register for push notifications on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = await Notifications.getExpoPushTokenAsync();
-        if (token) {
-          // Register token with backend
-          // This would be called after login
-        }
-      } catch (e) {
-        console.error("Failed to get push token:", e);
-      }
-    })();
-  }, []);
 
   const handleLeave = () => {
     Alert.alert("Leave group?", "You will stop receiving messages from this group.", [
