@@ -13,3 +13,4 @@ google-services.json
 *-firebase-adminsdk-*.json
 supabase/.temp/
 *.apk
+.idea/
