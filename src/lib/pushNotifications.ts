@@ -1,6 +1,14 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "./env";
+import { getSupabaseClient } from "./supabase/client";
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -45,7 +53,7 @@ export async function registerDeviceToken(token: string) {
     const platform = Platform.OS === "ios" ? "ios" : "android";
     const response = await fetch(`${getApiBaseUrl()}/api/push/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
       body: JSON.stringify({ platform, token }),
     });
     return response.ok;
@@ -60,7 +68,7 @@ export async function unregisterDeviceToken(token: string) {
     const platform = Platform.OS === "ios" ? "ios" : "android";
     const response = await fetch(`${getApiBaseUrl()}/api/push/token`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
       body: JSON.stringify({ platform, token }),
     });
     return response.ok;

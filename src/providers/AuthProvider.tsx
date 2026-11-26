@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Session, User, SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { registerForPushNotificationsAsync, getPushPlatform } from "@/lib/pushNotifications";
+import { registerForPushNotifications, registerDeviceToken } from "@/lib/pushNotifications";
 
 interface AuthState {
   user: User | null;
@@ -60,25 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     const registerPush = async () => {
-      const token = await registerForPushNotificationsAsync();
+      const token = await registerForPushNotifications();
       if (!token || cancelled) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-
-      if (!profile || cancelled) return;
-
-      await supabase.from("push_tokens").upsert(
-        {
-          profile_id: (profile as { id: string }).id,
-          token,
-          platform: getPushPlatform(),
-        },
-        { onConflict: "token" },
-      );
+      await registerDeviceToken(token);
     };
 
     registerPush();
@@ -87,16 +71,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   const signOut = async () => {
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-      if (profile) {
-        await supabase.from("push_tokens").delete().eq("profile_id", (profile as { id: string }).id);
-      }
-    }
     await supabase.auth.signOut();
   };
 
