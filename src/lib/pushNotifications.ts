@@ -44,7 +44,12 @@ export async function registerForPushNotifications() {
     }
   }
 
-  token = (await Notifications.getExpoPushTokenAsync()).data;
+  try {
+    token = (await Notifications.getExpoPushTokenAsync()).data;
+  } catch (e) {
+    console.warn("Push token unavailable (FCM not configured?):", e);
+    return null;
+  }
   return token;
 }
 

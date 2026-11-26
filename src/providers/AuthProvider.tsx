@@ -60,9 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     const registerPush = async () => {
-      const token = await registerForPushNotifications();
-      if (!token || cancelled) return;
-      await registerDeviceToken(token);
+      try {
+        const token = await registerForPushNotifications();
+        if (!token || cancelled) return;
+        await registerDeviceToken(token);
+      } catch (e) {
+        console.warn("Push registration failed:", e);
+      }
     };
 
     registerPush();
