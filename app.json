@@ -46,7 +46,8 @@
       [
         "expo-notifications",
         {
-          "color": "#7A1030"
+          "color": "#7A1030",
+          "sounds": ["./assets/sounds/eqb_notification.wav"]
         }
       ],
       "expo-splash-screen",

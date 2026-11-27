@@ -28,6 +28,7 @@ export async function registerForPushNotifications() {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#7A1030",
+      sound: "eqb_notification.wav",
     });
   }
 
